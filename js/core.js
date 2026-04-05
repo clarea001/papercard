@@ -745,25 +745,37 @@ if (customIntros && customIntros.length > 0) {
             });
         }
 
+
 function manageAutoSendTimer() {
     if (autoSendTimer) {
         clearInterval(autoSendTimer);
         autoSendTimer = null;
     }
     if (settings.autoSendEnabled) {
-        console.log(`[主动发送] 已启动，间隔：${settings.autoSendInterval} 分钟`);
-        const intervalMs = settings.autoSendInterval * 60 * 1000;
+        const safeInterval = Number(settings.autoSendInterval);
+        
+        // 👇 关键：如果用户没填或者填的不是数字，直接弹窗提醒他，并关掉开关
+        if (isNaN(safeInterval) || safeInterval <= 0) {
+            showNotification('请先在设置里填写正确的主动发送时间（分钟）', 'error');
+            settings.autoSendEnabled = false;
+            if(typeof updateUI === 'function') updateUI(); // 刷新开关状态
+            return; 
+        }
+        
+        console.log(`[主动发送] 已启动，间隔：${safeInterval} 分钟`);
+        const intervalMs = safeInterval * 60 * 1000;
         
         autoSendTimer = setInterval(() => {
             if (!document.body.classList.contains('batch-favorite-mode')) {
                 console.log('[主动发送] 触发回复');
-                simulateReply(); 
+                simulateReply();
             }
         }, intervalMs);
     } else {
         console.log('[主动发送] 功能已关闭');
     }
 }
+
 
         const updateUI = () => {
             const isCustomTheme = settings.colorTheme.startsWith('custom-');
