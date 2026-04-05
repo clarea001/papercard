@@ -1808,7 +1808,7 @@ function fallbackExport(dataStr, fileName) {
     showNotification('导出成功', 'success');
 }
 
-async function exportFullBackup() {
+/*async function exportFullBackup() {
     try {
         showNotification('正在准备全量备份...', 'info', 2000);
 
@@ -1854,13 +1854,29 @@ async function exportFullBackup() {
         console.error('全量备份失败:', error);
         showNotification('备份失败: ' + error.message, 'error');
     }
+}*/
+async function exportFullBackup() {
+    try {
+        // 先把内存中的数据写入 localforage，确保备份是最新的
+        await saveData();
+        if (typeof ChatBackup === 'undefined') {
+            showNotification('备份组件未加载，请刷新页面后重试', 'error');
+            return;
+        }
+        // 调用 backup-engine 导出 ZIP，格式兼容旧站
+        await ChatBackup.exportBackupToFile();
+    } catch (error) {
+        console.error('全量备份失败:', error);
+        showNotification('备份失败: ' + error.message, 'error');
+    }
 }
+
 
 
 /**
  * 【智能导入】自动识别备份类型并恢复
  */
-async function importAnyBackup(file) {
+/*async function importAnyBackup(file) {
     const reader = new FileReader();
     reader.onload = async (e) => {
         try {
@@ -1910,7 +1926,82 @@ async function importAnyBackup(file) {
         }
     };
     reader.readAsText(file);
+}*/
+async function importAnyBackup(file) {
+    try {
+        // 只读一次文件，用 ArrayBuffer 统一处理
+        const ab = await file.arrayBuffer();
+
+        // ===== 旧站备份检测（ZIP 或 v4 JSON）=====
+        if (typeof ChatBackup !== 'undefined') {
+            // ZIP 检测：PK 开头
+            const u8 = new Uint8Array(ab);
+            const isZip = ab.byteLength >= 4
+                && u8[0] === 0x50 && u8[1] === 0x4b
+                && (u8[2] === 0x03 || u8[2] === 0x05 || u8[2] === 0x07)
+                && (u8[3] === 0x04 || u8[3] === 0x06 || u8[3] === 0x08);
+
+            if (isZip) {
+                if (!confirm('检测到【旧站全量备份（ZIP）】\n\n这将覆盖当前所有数据，确定继续吗？')) return;
+                showNotification('正在恢复数据...', 'info', 3000);
+                const data = await ChatBackup.loadBackupFromArrayBuffer(ab);
+                if (!ChatBackup.isFullBackupShape(data)) {
+                    throw new Error('ZIP 内的备份格式无效');
+                }
+                await ChatBackup.applyBackupToStorage(data);
+                showNotification('恢复成功，页面即将刷新', 'success');
+                setTimeout(() => window.location.reload(), 1500);
+                return;
+            }
+
+            // 非 ZIP：尝试解析 JSON，检测旧站 v4 格式
+            let text = new TextDecoder('utf-8', { fatal: false }).decode(ab);
+            if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+            let parsed;
+            try { parsed = JSON.parse(text); } catch (_) { parsed = null; }
+
+            if (parsed && ChatBackup.isFullBackupShape(parsed)) {
+                if (!confirm('检测到【旧站全量备份（JSON）】\n\n这将覆盖当前所有数据，确定继续吗？')) return;
+                showNotification('正在恢复数据...', 'info', 3000);
+                await ChatBackup.applyBackupToStorage(parsed);
+                showNotification('恢复成功，页面即将刷新', 'success');
+                setTimeout(() => window.location.reload(), 1500);
+                return;
+            }
+        }
+
+        // ===== 新站自己的格式检测 =====
+        let text2 = new TextDecoder('utf-8', { fatal: false }).decode(ab);
+        if (text2.charCodeAt(0) === 0xFEFF) text2 = text2.slice(1);
+        const imported = JSON.parse(text2);
+
+        // 情况 A：新站 FULL_BACKUP_AUTO
+        if (imported._meta && imported._meta.type === 'FULL_BACKUP_AUTO' && imported.data) {
+            const count = Object.keys(imported.data).length;
+            if (!confirm(`检测到【全量备份文件】，包含 ${count} 个数据项。\n\n⚠️ 这将覆盖当前所有数据！是否继续？`)) return;
+            showNotification('正在恢复数据...', 'info', 3000);
+            await localforage.clear();
+            for (const key in imported.data) {
+                await localforage.setItem(key, imported.data[key]);
+            }
+            showNotification('恢复成功，页面即将刷新', 'success');
+            setTimeout(() => window.location.reload(), 1500);
+            return;
+        }
+
+        // 情况 B：选择性备份（新站导出 或 旧站 exportChatHistory 导出）
+        if (imported.version || imported.messages || imported.settings) {
+            handleLegacyImport(imported);
+            return;
+        }
+
+        throw new Error('无法识别的文件格式');
+    } catch (error) {
+        console.error('导入失败:', error);
+        showNotification('文件格式错误或已损坏', 'error');
+    }
 }
+
 
 async function handleLegacyImport(importedData) {
     try {

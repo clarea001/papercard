@@ -707,7 +707,7 @@ function bindExportImportEvents() {
     const handleImportClick = () => {
         const inp = document.createElement('input');
         inp.type = 'file';
-        inp.accept = '.json';
+        inp.accept = '.json,.zip';
         inp.onchange = e => {
             if (e.target.files[0]) {
                 // 调用新的智能导入函数

@@ -582,7 +582,7 @@ document.getElementById('chat-settings').addEventListener('click', () => {
             if (importChatBtnDm) {
                 importChatBtnDm.addEventListener('click', () => {
                     const inp = document.createElement('input');
-                    inp.type = 'file'; inp.accept = '.json';
+                    inp.type = 'file'; inp.accept = '.json,.zip';
                     inp.onchange = e => { if (e.target.files[0] && typeof importChatHistory === 'function') importChatHistory(e.target.files[0]); };
                     inp.click();
                 });
@@ -601,7 +601,7 @@ document.getElementById('chat-settings').addEventListener('click', () => {
             if (importAllBtn) {
                 importAllBtn.addEventListener('click', () => {
                     const inp = document.createElement('input');
-                    inp.type = 'file'; inp.accept = '.json';
+                    inp.type = 'file'; inp.accept = '.json,.zip';
                     inp.onchange = e => { if (e.target.files[0] && typeof importChatHistory === 'function') importChatHistory(e.target.files[0]); };
                     inp.click();
                 });
