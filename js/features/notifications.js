@@ -86,6 +86,11 @@ window._sendPartnerNotification = function(title, body) {
 };
 
 window.handleNotifToggle = function(checkbox) {
+    if (checkbox.checked && !settings.autoSendEnabled) {
+        checkbox.checked = false;
+        showNotification('请先在聊天设置中开启「主动发送」功能', 'warning', 3000);
+        return;
+    }
     var statusEl = document.getElementById('notif-status-text');
     if (!('Notification' in window)) {
         checkbox.checked = false;
