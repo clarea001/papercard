@@ -477,7 +477,7 @@
      * @param {object} data 原始备份 JSON
      * @param {{ selective?: boolean, selectedCategoryIds?: string[], categories?: array }} opt
      */
-    async function applyBackupToStorage(data, opt) {
+    /*async function applyBackupToStorage(data, opt) {
         opt = opt || {};
         var selective = !!opt.selective;
         var mediaStore = data.mediaStore || {};
@@ -521,7 +521,82 @@
         if (typeof APP_PREFIX !== 'undefined' && typeof SESSION_ID !== 'undefined') {
             try { await localforage.setItem(APP_PREFIX + 'lastSessionId', SESSION_ID); } catch (e3) {}
         }
+    }*/
+
+    async function applyBackupToStorage(data, opt) {
+        opt = opt || {};
+        var selective = !!opt.selective;
+        var mediaStore = data.mediaStore || {};
+        var lfRaw = getLfSource(data);
+        var lsRaw = data.localStorage || {};
+
+        if (selective && opt.selectedCategoryIds && opt.categories) {
+            lfRaw = filterLfByCategories(lfRaw, opt.selectedCategoryIds, opt.categories);
+            lsRaw = filterLsByCategories(lsRaw, opt.selectedCategoryIds, opt.categories);
+        }
+
+        var lfKeys = Object.keys(lfRaw);
+        var backupSid = data.sessionId || inferBackupSessionId(lfKeys, data.appPrefix);
+        var curSid = typeof SESSION_ID !== 'undefined' ? SESSION_ID : null;
+        var appPfx = data.appPrefix || (typeof APP_PREFIX !== 'undefined' ? APP_PREFIX : 'CHAT_APP_V3_');
+        
+        // ========== 修改 1：强制使用备份的 session ID，不要重映射 ==========
+        // 这样可以保证数据一致性
+        var needRemap = false; // 原来是：backupSid && curSid && backupSid !== curSid;
+        
+        // ========== 修改 2：更新当前 SESSION_ID 为备份的 ID ==========
+        if (backupSid && typeof SESSION_ID !== 'undefined') {
+            SESSION_ID = backupSid;
+        }
+
+        for (var i = 0; i < lfKeys.length; i++) {
+            var lk = lfKeys[i];
+            var targetKey = needRemap ? remapLfKey(lk, backupSid, curSid, appPfx) : lk;
+            var val = inlineMediaTree(lfRaw[lk], mediaStore);
+            try {
+                await localforage.setItem(targetKey, val);
+            } catch (e) {
+                console.warn('[backup] 写入失败', targetKey, e);
+            }
+        }
+
+        for (var k in lsRaw) {
+            if (!Object.prototype.hasOwnProperty.call(lsRaw, k)) continue;
+            var targetLsKey = needRemap ? remapLfKey(k, backupSid, curSid, appPfx) : k;
+            try {
+                var lsv = processLocalStorageValueForImport(lsRaw[k], mediaStore);
+                
+                // ========== 修改 3：移除跳过大图片的限制 ==========
+                // 原来的代码会跳过长度超过2000的data:image，导致背景图片丢失
+                // if (typeof lsv === 'string' && lsv.indexOf('data:image/') === 0 && lsv.length > 2000) continue;
+                
+                localStorage.setItem(targetLsKey, lsv);
+            } catch (e2) {
+                console.warn('[backup] localStorage 恢复失败', targetLsKey, e2);
+            }
+        }
+
+        // ========== 修改 4：确保 sessionList 和 lastSessionId 正确 ==========
+        if (typeof APP_PREFIX !== 'undefined' && typeof SESSION_ID !== 'undefined') {
+            try {
+                // 确保 sessionList 中有这个 session
+                var sessionList = await localforage.getItem(APP_PREFIX + 'sessionList') || [];
+                if (!sessionList.some(s => s.id === SESSION_ID)) {
+                    sessionList.push({
+                        id: SESSION_ID,
+                        name: '导入的会话 ' + new Date().toLocaleDateString(),
+                        createdAt: Date.now()
+                    });
+                    await localforage.setItem(APP_PREFIX + 'sessionList', sessionList);
+                }
+                // 更新 lastSessionId
+                await localforage.setItem(APP_PREFIX + 'lastSessionId', SESSION_ID);
+            } catch (e3) {
+                console.warn('[backup] sessionList 更新失败:', e3);
+            }
+        }
     }
+
 
     function isFullBackupShape(d) {
         if (!d || typeof d !== 'object') return false;
