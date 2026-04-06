@@ -521,6 +521,7 @@ document.getElementById('chat-settings').addEventListener('click', () => {
     if (autoToggle) autoToggle.classList.toggle('active', !!settings.autoSendEnabled);
     updateAutoSendUI();
     updateDelayUI();
+    updateRnrUI(); 
     const immToggle = document.getElementById('immersive-toggle');
     if (immToggle) immToggle.classList.toggle('active', document.body.classList.contains('immersive-mode'));
     const rrStyle = settings.readReceiptStyle || 'icon';
@@ -1141,10 +1142,11 @@ document.getElementById('chat-settings').addEventListener('click', () => {
                 });
             }
             // --- 已读不回概率滑动条逻辑 ---
-            const rnrToggle = document.querySelector('#read-no-reply-toggle');
+           /*const rnrToggle = document.querySelector('#read-no-reply-toggle');
             const rnrControl = document.getElementById('read-no-reply-chance-control');
             const rnrSlider = document.getElementById('read-no-reply-chance-slider');
             const rnrValue = document.getElementById('read-no-reply-chance-value');
+
 
             // 初始化滑动条状态
             if (rnrSlider) {
@@ -1171,6 +1173,47 @@ document.getElementById('chat-settings').addEventListener('click', () => {
                 rnrToggle.addEventListener('click', () => {
                     setTimeout(() => {
                         rnrControl.style.display = settings.allowReadNoReply ? 'block' : 'none';
+                    }, 20);
+                });
+            }*/
+
+            // --- 已读不回概率滑动条逻辑 ---
+            const rnrToggle = document.querySelector('#read-no-reply-toggle');
+            const rnrControl = document.getElementById('read-no-reply-chance-control');
+            const rnrSlider = document.getElementById('read-no-reply-chance-slider');
+            const rnrValue = document.getElementById('read-no-reply-chance-value');
+
+            // 【新增】提取一个专门的 UI 同步函数，保证每次打开弹窗都能恢复正确状态
+            const updateRnrUI = () => {
+                if (rnrToggle) rnrToggle.classList.toggle('active', !!settings.allowReadNoReply);
+                if (rnrControl) rnrControl.style.display = settings.allowReadNoReply ? 'block' : 'none';
+                if (rnrSlider) {
+                    // 如果设置里有值就用设置的，没有或者异常就安全回退到 20%
+                    const chance = (settings.readNoReplyChance !== undefined && settings.readNoReplyChance !== null) ? settings.readNoReplyChance : 0.2;
+                    rnrSlider.value = Math.round(chance * 100);
+                    if (rnrValue) rnrValue.textContent = rnrSlider.value + '%';
+                }
+            };
+
+            // 页面刚加载时执行一次同步
+            updateRnrUI();
+
+            // 滑动条拖动逻辑
+            if (rnrSlider) {
+                rnrSlider.addEventListener('input', (e) => {
+                    const val = parseInt(e.target.value);
+                    settings.readNoReplyChance = val / 100;
+                    if (rnrValue) rnrValue.textContent = val + '%';
+                });
+                rnrSlider.addEventListener('change', throttledSaveData);
+            }
+
+            // 点击开关时的逻辑
+            if (rnrToggle && rnrControl) {
+                rnrToggle.addEventListener('click', () => {
+                    // 延迟 20ms 执行，确保拿到最新的布尔值
+                    setTimeout(() => {
+                        updateRnrUI();
                     }, 20);
                 });
             }

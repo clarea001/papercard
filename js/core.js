@@ -2043,7 +2043,7 @@ async function handleLegacyImport(importedData) {
             return;
         }
 
-        overlay.innerHTML = `
+        /*overlay.innerHTML = `
         <div style="background:var(--secondary-bg);border-radius:20px;padding:24px;width:88%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.4);animation:modalContentSlideIn 0.3s ease forwards;">
             <div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:16px;">选择要导入的内容</div>
             <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:20px;max-height:50vh;overflow-y:auto;">
@@ -2101,6 +2101,117 @@ async function handleLegacyImport(importedData) {
                  if (typeof renderMessages === 'function') renderMessages();
             }
             showNotification('导入成功', 'success');
+        };*/
+                overlay.innerHTML = `
+        <div style="background:var(--secondary-bg);border-radius:20px;padding:24px;width:88%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.4);animation:modalContentSlideIn 0.3s ease forwards;">
+            <div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:16px;">选择要导入的内容</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">文件中检测到以下数据，选择要导入的模块</div>
+            
+            <!-- 新增：追加/覆盖 模式选择 -->
+            <div style="display:flex;gap:8px;margin-bottom:16px;">
+                <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;padding:8px 0;border:1.5px solid var(--accent-color);border-radius:10px;background:rgba(var(--accent-color-rgb,224,105,138),0.1);font-size:12px;color:var(--accent-color);font-weight:600;" id="mode-overwrite-label">
+                    <input type="radio" name="import-mode" value="overwrite" checked style="display:none;">
+                    覆盖导入
+                </label>
+                <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;padding:8px 0;border:1.5px solid var(--border-color);border-radius:10px;font-size:12px;color:var(--text-secondary);" id="mode-append-label">
+                    <input type="radio" name="import-mode" value="append" style="display:none;">
+                    追加导入
+                </label>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:20px;max-height:40vh;overflow-y:auto;">
+                ${rows.join('')}
+            </div>
+            <div style="display:flex;gap:10px;">
+                <button id="_imp_cancel" style="flex:1;padding:11px;border:1px solid var(--border-color);border-radius:12px;background:none;color:var(--text-secondary);font-size:13px;cursor:pointer;font-family:var(--font-family);">取消</button>
+                <button id="_imp_confirm" style="flex:2;padding:11px;border:none;border-radius:12px;background:var(--accent-color);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-family);">确认导入</button>
+            </div>
+        </div>`;
+        document.body.appendChild(overlay);
+        const closeDialog = () => overlay.remove();
+        overlay.onclick = (e) => { if(e.target === overlay) closeDialog(); };
+        // 给模式按钮绑定切换高亮样式的事件
+        const overwriteLabel = document.getElementById('mode-overwrite-label');
+        const appendLabel = document.getElementById('mode-append-label');
+        if (overwriteLabel && appendLabel) {
+            overwriteLabel.addEventListener('click', () => {
+                overwriteLabel.style.borderColor = 'var(--accent-color)'; overwriteLabel.style.background = 'rgba(var(--accent-color-rgb,224,105,138),0.1)'; overwriteLabel.style.color = 'var(--accent-color)'; overwriteLabel.style.fontWeight = '600';
+                appendLabel.style.borderColor = 'var(--border-color)'; appendLabel.style.background = 'none'; appendLabel.style.color = 'var(--text-secondary)'; appendLabel.style.fontWeight = '400';
+            });
+            appendLabel.addEventListener('click', () => {
+                appendLabel.style.borderColor = 'var(--accent-color)'; appendLabel.style.background = 'rgba(var(--accent-color-rgb,224,105,138),0.1)'; appendLabel.style.color = 'var(--accent-color)'; appendLabel.style.fontWeight = '600';
+                overwriteLabel.style.borderColor = 'var(--border-color)'; overwriteLabel.style.background = 'none'; overwriteLabel.style.color = 'var(--text-secondary)'; overwriteLabel.style.fontWeight = '400';
+            });
+        }
+
+        document.getElementById('_imp_confirm').onclick = async function() {
+            closeDialog();
+            // 获取用户选择的导入模式
+            const modeRadio = overlay.querySelector('input[name="import-mode"]:checked');
+            const isAppend = modeRadio && modeRadio.value === 'append';
+            
+            let reloadNeeded = false;
+
+            // 遍历注册表执行导入
+            window.APP_DATA_REGISTRY.forEach(reg => {
+                if (reg.isVirtual) return; // 虚拟组跳过
+
+                // 判断是否勾选
+                let isChecked = false;
+                if (reg.group) {
+                    const groupCb = overlay.querySelector(`[data-imp-id="${reg.group}"]`);
+                    if (groupCb) isChecked = groupCb.checked;
+                } else {
+                    const cb = overlay.querySelector(`[data-imp-id="${reg.id}"]`);
+                    if (cb) isChecked = cb.checked;
+                }
+
+                if (isChecked && importedData[reg.id] !== undefined) {
+                    if (isAppend) {
+                        // ========= 追加模式逻辑 =========
+                        if (reg.id === 'messages') {
+                            // 消息追加：获取现有ID集合，过滤掉重复的，然后拼接到末尾
+                            const existingIds = new Set(messages.map(m => m.id));
+                            const newMsgs = (importedData[reg.id] || []).map(m => ({...m, timestamp: new Date(m.timestamp)}));
+                            const uniqueNew = newMsgs.filter(m => !existingIds.has(m.id));
+                            messages = [...messages, ...uniqueNew];
+                            reloadNeeded = true;
+                        } else if (reg.id === 'settings') {
+                            // 设置追加：其实就是合并属性（新属性覆盖旧属性，旧属性保留）
+                            Object.assign(settings, importedData[reg.id]);
+                            reloadNeeded = true;
+                        } else {
+                            // 其他数据追加（如字卡、表情、纪念日等数组或对象）
+                            const curVal = _getRegVal(reg.id);
+                            const incVal = importedData[reg.id];
+                            if (Array.isArray(curVal) && Array.isArray(incVal)) {
+                                _setRegVal(reg.id, [...curVal, ...incVal]);
+                            } else if (typeof curVal === 'object' && curVal !== null && typeof incVal === 'object') {
+                                _setRegVal(reg.id, { ...curVal, ...incVal });
+                            } else {
+                                _setRegVal(reg.id, incVal);
+                            }
+                        }
+                    } else {
+                        // ========= 覆盖模式逻辑（保持原样） =========
+                        if (reg.onImport) {
+                            reg.onImport(importedData[reg.id]);
+                        } else {
+                            _setRegVal(reg.id, importedData[reg.id]);
+                        }
+                        if (reg.id === 'messages' || reg.id === 'settings') reloadNeeded = true;
+                    }
+                }
+            });
+
+            await saveData(); // 保存到数据库
+
+            // 刷新界面
+            if (reloadNeeded) {
+                if (typeof updateUI === 'function') updateUI();
+                if (typeof renderMessages === 'function') renderMessages();
+            }
+            showNotification(isAppend ? '追加导入成功' : '覆盖导入成功', 'success');
         };
 
     } catch (e) {
