@@ -2175,7 +2175,8 @@ async function handleLegacyImport(importedData) {
                             const existingIds = new Set(messages.map(m => m.id));
                             const newMsgs = (importedData[reg.id] || []).map(m => ({...m, timestamp: new Date(m.timestamp)}));
                             const uniqueNew = newMsgs.filter(m => !existingIds.has(m.id));
-                            messages = [...messages, ...uniqueNew];
+                           // messages = [...messages, ...uniqueNew];
+                            messages = [...messages, ...uniqueNew].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)); // 👈 加上 .sort 按时间排个序
                             reloadNeeded = true;
                         } else if (reg.id === 'settings') {
                             // 设置追加：其实就是合并属性（新属性覆盖旧属性，旧属性保留）

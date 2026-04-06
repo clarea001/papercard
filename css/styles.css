@@ -11184,7 +11184,6 @@ html[data-theme="dark"] .period-stat-value { color: var(--accent-color-dark); }
     height: 18px;
     border-radius: 50%;
     background: var(--accent-color, #f0c040); /* 自动跟随主题强调色 */
-    border: 3px solid var(--primary-bg, #ffffff); /* 白边，更精致 */
     box-shadow: 0 1px 4px rgba(0,0,0,0.2);
     cursor: pointer;
     transition: transform 0.15s ease;
@@ -11203,7 +11202,6 @@ html[data-theme="dark"] .period-stat-value { color: var(--accent-color-dark); }
     height: 18px;
     border-radius: 50%;
     background: var(--accent-color, #f0c040);
-    border: 3px solid var(--primary-bg, #ffffff);
     box-shadow: 0 1px 4px rgba(0,0,0,0.2);
     cursor: pointer;
 }
@@ -11214,7 +11212,6 @@ html[data-theme="dark"] .period-stat-value { color: var(--accent-color-dark); }
     height: 18px;
     border-radius: 50%;
     background: var(--accent-color, #f0c040);
-    border: 3px solid var(--primary-bg, #ffffff);
     box-shadow: 0 1px 4px rgba(0,0,0,0.2);
     cursor: pointer;
 }
