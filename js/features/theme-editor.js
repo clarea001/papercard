@@ -551,7 +551,13 @@ function populateThemeSelector() {
             if (scheme.chatBackground) {
                 applyBackground(scheme.chatBackground);
                 safeSetItem(getStorageKey('chatBackground'), scheme.chatBackground);
-                localforage.setItem(getStorageKey('chatBackground'), scheme.chatBackground); 
+                localforage.setItem(getStorageKey('chatBackground'), scheme.chatBackground).catch(err => {
+                    console.warn('保存方案背景到主数据库失败:', err);
+                });
+            } else {
+                // 如果方案里没背景，要确保清掉主仓库里的旧背景，防止残留
+                localforage.removeItem(getStorageKey('chatBackground')).catch(()=>{});
+                safeRemoveItem(getStorageKey('chatBackground')); 
             }
 
             updateUI();
