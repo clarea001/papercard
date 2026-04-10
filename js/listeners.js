@@ -165,22 +165,21 @@ function initChatActionListeners() {
         } 
         throttledSaveData();
     });
-
-            // 新的发送逻辑：先打断，再发送
+    // 新的发送逻辑
     DOMElements.sendBtn.addEventListener('click', () => {
-        /*if (typeof window.cancelPartnerReply === 'function') {
-           // window.cancelPartnerReply();
-        }*/
-
         const text = DOMElements.messageInput.value.trim();
         const imageFile = DOMElements.imageInput.files[0];
         if (text || imageFile) {
-            sendMessage();
+            // 🌟 如果开启了保留键盘，走特殊的不失焦发送逻辑
             if (window._keepKeyboardAlive) {
-                setTimeout(() => DOMElements.messageInput.focus(), 100);
+            handleKeepAliveSend(text, imageFile);
+            } else {
+            sendMessage(); // 正常发送（正常会失焦清空）
             }
         }
     });
+}
+
 // ========== 继续回复弹出按钮组逻辑 ==========
     const continueBtn = document.getElementById('continue-btn');
     const continueSubBtns = document.getElementById('continue-sub-btns');
@@ -249,9 +248,6 @@ function initChatActionListeners() {
             continueSubBtns.classList.remove('active');
         }
     });
-};
-
-
 
 function initModalListeners() {
     const modals = document.querySelectorAll('.modal');
@@ -1685,7 +1681,7 @@ document.getElementById('chat-settings').addEventListener('click', () => {
             });
 
             // 回车发送消息功能（Shift+Enter依然是换行）
-            DOMElements.messageInput.addEventListener('keydown', (e) => {
+            /*DOMElements.messageInput.addEventListener('keydown', (e) => {
                 if (settings.enterToSendEnabled && e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault(); // 阻止默认的换行
                     
@@ -1700,7 +1696,25 @@ document.getElementById('chat-settings').addEventListener('click', () => {
                         sendMessage();
                     }
                 }
+            });*/
+            // 回车发送消息功能（Shift+Enter依然是换行）
+            DOMElements.messageInput.addEventListener('keydown', (e) => {
+                if (settings.enterToSendEnabled && e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault(); // 阻止默认的换行
+                    
+                    const text = DOMElements.messageInput.value.trim();
+                    const imageFile = DOMElements.imageInput.files[0];
+                    if (text || imageFile) {
+                    // 🌟 如果开启了保留键盘，走特殊的不失焦发送逻辑
+                    if (window._keepKeyboardAlive) {
+                        handleKeepAliveSend(text, imageFile);
+                    } else {
+                        sendMessage();
+                    }
+                    }
+                }
             });
+
         } // 🌟 这里是函数结尾的大括号，千万别漏了
 
 
