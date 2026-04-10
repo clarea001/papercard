@@ -1194,7 +1194,7 @@ document.getElementById('chat-settings').addEventListener('click', () => {
                 '#read-no-reply-toggle': { prop: 'allowReadNoReply', name: '已读不回' },
                 '#emoji-mix-toggle': { prop: 'emojiMixEnabled', name: '表情混入消息' },
                 '#enter-send-toggle': { prop: 'enterToSendEnabled', name: '回车发送消息' },
-                '#keep-keyboard-alive-toggle': { prop: 'keepKeyboardAlive', name: '发送后键盘不收起' } // 🌟【新增】
+                '#keep-keyboard-alive-toggle': { prop: 'keepKeyboardAlive', name: '发送后保留键盘' } // 🌟【新增】
             };
 
             for (const [selector, {
@@ -1209,6 +1209,9 @@ document.getElementById('chat-settings').addEventListener('click', () => {
                 element.addEventListener('click', () => {
                     if (prop === 'emojiMixEnabled' && settings[prop] === undefined) settings[prop] = true;
                     settings[prop] = !settings[prop];
+                    if (prop === 'keepKeyboardAlive') {
+                        window._keepKeyboardAlive = settings[prop];
+                    }
                     throttledSaveData();
                     updateUI();
                     element.classList.toggle('active', !!settings[prop]);
