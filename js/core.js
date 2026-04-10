@@ -107,6 +107,7 @@ autoSendInterval: 5,
         bottomCollapseMode: false,
         emojiMixEnabled: true,
         boardPartnerWriteEnabled: false,
+        keepKeyboardAlive: false,
             };
         }
 
@@ -870,7 +871,8 @@ function manageAutoSendTimer() {
                 '#read-no-reply-toggle': 'allowReadNoReply',
                 '#emoji-mix-toggle': 'emojiMixEnabled',
                 '#enter-send-toggle': 'enterToSendEnabled',
-                '#auto-send-toggle': 'autoSendEnabled'
+                '#auto-send-toggle': 'autoSendEnabled',
+                '#keep-keyboard-alive-toggle': 'keepKeyboardAlive' // 🌟【加上这一行】
             };
             for (const [sel, prop] of Object.entries(_pillSyncMap)) {
                 const el = document.querySelector(sel);

@@ -124,7 +124,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         updateLoader('正在读取记忆存档...', '40%');
         await safeAwait(loadData());
-        
+        // ========== 强制修复：确保新增的设置项能被正确读取和保存 ==========
+        if (typeof settings.keepKeyboardAlive === 'undefined') {
+            settings.keepKeyboardAlive = false;
+        }
+        // 无论存没存进去，都强行同步给全局变量
+        window._keepKeyboardAlive = !!settings.keepKeyboardAlive;
+
         // ====== 页面加载时，恢复用户自定义的字体设置 ======
         if (settings.customFontUrl && settings.customFontUrl.trim()) {
         applyCustomFont(settings.customFontUrl.trim()).catch(err => {
