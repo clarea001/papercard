@@ -167,17 +167,14 @@ function initChatActionListeners() {
     });
     // 新的发送逻辑
     DOMElements.sendBtn.addEventListener('click', () => {
-        const text = DOMElements.messageInput.value.trim();
-        const imageFile = DOMElements.imageInput.files[0];
-        if (text || imageFile) {
-            // 🌟 如果开启了保留键盘，走特殊的不失焦发送逻辑
-            if (window._keepKeyboardAlive) {
-            handleKeepAliveSend(text, imageFile);
-            } else {
-            sendMessage(); // 正常发送（正常会失焦清空）
-            }
-        }
-    });
+    const text = DOMElements.messageInput.value.trim();
+    const imageFile = DOMElements.imageInput.files[0];
+    if (text || imageFile) {
+       DOMElements.messageInput.dataset.keepFocus = window._keepKeyboardAlive ? '1' : '0';
+        sendMessage(); // 直接调用，不需要判断了
+    }
+});
+
 
 // ========== 继续回复弹出按钮组逻辑 ==========
     const continueBtn = document.getElementById('continue-btn');
@@ -1698,18 +1695,13 @@ document.getElementById('chat-settings').addEventListener('click', () => {
             });*/
             // 回车发送消息功能（Shift+Enter依然是换行）
             DOMElements.messageInput.addEventListener('keydown', (e) => {
-                if (settings.enterToSendEnabled && e.key === 'Enter' && !e.shiftKey) {
+                if (settings.enterToSendEnabled && e.key === 'Enter' && !e.ShiftKey) {
                     e.preventDefault(); // 阻止默认的换行
-                    
+                    DOMElements.messageInput.dataset.keepFocus = window._keepKeyboardAlive ? '1' : '0';
                     const text = DOMElements.messageInput.value.trim();
                     const imageFile = DOMElements.imageInput.files[0];
                     if (text || imageFile) {
-                    // 🌟 如果开启了保留键盘，走特殊的不失焦发送逻辑
-                    if (window._keepKeyboardAlive) {
-                        handleKeepAliveSend(text, imageFile);
-                    } else {
-                        sendMessage();
-                    }
+                        sendMessage(); // 正常走 sendMessage
                     }
                 }
             });

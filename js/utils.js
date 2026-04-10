@@ -304,45 +304,6 @@ async function checkStorageSpace() {
   }
   return estimate;
 }
-/**
- * 键盘保活模式下的专用发送函数
- * 原理：直接操作数据和DOM渲染，全程不触发输入框的 blur 事件
- */
-function handleKeepAliveSend(text, imageFile) {
-  // 1. 立即静默清空输入框（此时焦点还在，键盘不会掉）
-  DOMElements.messageInput.value = '';
-  // 强制把高度压回单行，但不触发失焦
-  DOMElements.messageInput.style.height = 'auto'; 
-
-  // 2. 清理图片选择（如果有的话）
-  if (DOMElements.imageInput) {
-    DOMElements.imageInput.value = '';
-  }
-
-  // 3. 直接往 messages 数组里塞一条新消息（绕过 sendMessage 里的失焦逻辑）
-  const newMsg = {
-    id: Date.now(),
-    sender: 'user',
-    text: text || '',
-    image: null, // 如果需要支持保活模式下发图片，需额外写异步读取逻辑，这里先保证文字绝对顺滑
-    timestamp: new Date(),
-    type: 'normal'
-  };
-  
-  messages.push(newMsg);
-  
-  // 4. 刷新界面并保存
-  renderMessages(true);
-  throttledSaveData();
-  
-  // 5. 触发对方的模拟回复
-  const delayRange = settings.replyDelayMax - settings.replyDelayMin;
-  const randomDelay = settings.replyDelayMin + Math.random() * delayRange;
-  setTimeout(simulateReply, randomDelay);
-  
-  // 6. 播放发送音效
-  playSound('send');
-}
 
 // 在应用启动时检查
 window.addEventListener('load', () => {

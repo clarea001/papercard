@@ -1374,9 +1374,25 @@ function manageAutoSendTimer() {
             const imageFile = DOMElements.imageInput.files[0];
             if (!text && !imageFile && type === 'normal') return;
 
-            DOMElements.messageInput.value = '';
-            DOMElements.messageInput.style.height = '46px';
-            DOMElements.messageInput.blur();
+            //DOMElements.messageInput.value = '';
+            //DOMElements.messageInput.style.height = '46px';
+            //DOMElements.messageInput.blur();
+            // 🌟 键盘保活模式：静默清空，绝对不触发 blur
+            // 🔥 核心改动：完全以标记为准，不再跟其他设置耦合
+            if (DOMElements.messageInput.dataset.keepFocus) {
+                // 用户主动开启了保活：静默清空，绝对不触发 blur
+                DOMElements.messageInput.value = '';
+                DOMElements.messageInput.style.height = '46px';
+            } else {
+                // 用户没开保活（或点击发送按钮）：正常模式，清空并失焦（让键盘收起）
+                DOMElements.messageInput.value = '';
+                DOMElements.messageInput.style.height = '46px';
+                DOMElements.messageInput.blur();
+            }
+            // 清理标记
+            delete DOMElements.messageInput.dataset.keepFocus;
+
+
             if (imageFile && imageFile.size > MAX_IMAGE_SIZE) {
                 showNotification('图片大小不能超过5MB', 'error'); DOMElements.imageInput.value = ''; return;
             }
@@ -1400,6 +1416,8 @@ function manageAutoSendTimer() {
                 if (type !== 'system') playSound('send');
                 currentReplyTo = null;
                 updateReplyPreview();
+                // 🌟 发送完毕后，把标记擦除，防止影响后续正常的失焦操作
+                delete DOMElements.messageInput.dataset.keepFocus;
 
                 if (type === 'normal') {
                     window._replyAborted = false;
@@ -1476,6 +1494,10 @@ function manageAutoSendTimer() {
                     }
                 }
             };
+            // 🔥 必须严格等于字符串 '1' 才抢焦点，彻底杜绝幽灵标记或类型错误
+            if (DOMElements.messageInput.dataset.keepFocus === '1') {
+                setTimeout(() => DOMElements.messageInput.focus(), 0);
+            }
 
             if (imageFile) {
                 showNotification('正在优化图片...', 'info', 1500);
