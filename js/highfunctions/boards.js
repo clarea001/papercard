@@ -424,12 +424,12 @@ function openDetail(threadId, type) {
       const isStarter = (idx === 0); // 第一条永远是主留言
       
       let cHtml = '';
-      //if (r.image) cHtml += `<img src="${r.image}" style="max-width:150px;border-radius:8px;display:block;margin-bottom:8px;margin-left:40px;cursor:pointer;" onclick="viewImage('${r.image}')">`;
+      // 1. 先渲染文字和图片
+      if (r.text) cHtml += `<div class="${isSenderMe ? 'board-user-text' : 'board-reply-text'}" id="bv2-text-${r.id}">${escapeHtml(r.text)}</div>`;
+      if (r.image) cHtml += `<img src="${r.image}" style="max-width:150px;border-radius:8px;display:block;margin-bottom:8px;margin-left:40px;cursor:pointer;" onclick="viewImage('${r.image}')">`;
       //if (r.sticker) cHtml += `<img src="${r.sticker}" style="max-width:120px;border-radius:8px;display:block;margin-top:8px;margin-left:40px;">`;
       //if (r.text) cHtml += `<div class="${isSenderMe ? 'board-user-text' : 'board-reply-text'}" id="bv2-text-${r.id}">${escapeHtml(r.text)}</div>`;
-              // 1. 先渲染文字
-        if (r.text) cHtml += `<div class="${isSenderMe ? 'board-user-text' : 'board-reply-text'}" id="bv2-text-${r.id}">${escapeHtml(r.text)}</div>`;
-        
+              
         // 2. 再渲染表情包（保证在文字后面）
         // 兼容老的单个sticker格式
         if (r.sticker) cHtml += `<img src="${r.sticker}" style="max-width:120px;border-radius:8px;display:block;margin-top:8px;margin-left:40px;">`;
