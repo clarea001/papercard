@@ -48,3 +48,4 @@ window.hideAppearancePanel = function() {
     var galleryBanner = document.getElementById('gallery-banner-entry');
     if (galleryBanner) galleryBanner.style.display = 'flex';
 };
+

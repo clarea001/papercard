@@ -227,14 +227,14 @@ function applyCustomBubbleCss(cssCode) {
     
     // Ensure image-only bubbles stay transparent even when custom CSS applies
     styleTag.textContent = cssCode + `
-.message.message-image-bubble-none,
-.message-image-bubble-none {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    border-radius: 0 !important;
-}`;
+    .message.message-image-bubble-none,
+    .message-image-bubble-none {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+    }`;
 }
 
 function applyGlobalThemeCss(cssCode) {
