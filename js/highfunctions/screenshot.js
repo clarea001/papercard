@@ -654,7 +654,19 @@ function generateTxtFile(msgs) {
         const sender = msg.sender === 'user' ? (settings.myName || '我') : (settings.partnerName || '对方');
         
         // 获取消息内容
-        const content = msg.text || '[图片/文件]';
+        //const content = msg.text || '[图片/文件]';
+        // 获取消息内容（优先显示文字，没有文字但如果有图，就显示为 [表情包]）
+        let content = msg.text || '';
+
+        // 兼容多种可能存储图片的字段名
+        const hasImage = msg.image || msg.sticker || msg.img || msg.fileUrl || msg.url || '';
+
+        if (!content.trim() && hasImage) {
+            content = '[表情包]';
+        } else if (!content.trim()) {
+            content = '[图片/文件]';
+        }
+
 
         // 处理引用内容 (全文)
         let replyStr = "";
