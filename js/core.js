@@ -2674,7 +2674,7 @@ if (customStatuses && customStatuses.length > 0) {
             await localforage.setItem(`${APP_PREFIX}lastSessionId`, SESSION_ID);
         }
 // ====== 壁纸模式切换与初始化逻辑 ======
-function switchBgMode(mode) {
+window.switchBgMode = function(mode) {
     if (typeof settings === 'undefined') return;
     settings.bgDisplayMode = mode;
     if (typeof throttledSaveData === 'function') throttledSaveData();
