@@ -436,15 +436,17 @@ const loadData = async () => {
             updateAvatar(DOMElements.me.avatar, myAvatarSrc);
         }
 
+        const currentBgMode = settings.bgDisplayMode || 'contain';
         if (savedChatBg) {
-            applyBackground(savedChatBg);
+            applyBackground(savedChatBg, currentBgMode);
         } else {
             const lsBg = safeGetItem(getStorageKey('chatBackground'));
             if (lsBg) {
-                applyBackground(lsBg);
+                applyBackground(lsBg, currentBgMode);
                 localforage.setItem(getStorageKey('chatBackground'), lsBg);
             }
         }
+
 
         try { await initMoodData(); } catch(e) { console.warn("心情数据加载失败", e); }
         try { await loadEnvelopeData(); } catch(e) { console.warn("留言板数据加载失败", e); }
