@@ -515,23 +515,7 @@
                 opacity: 1;
             }
         }
-        /*body::before {
-            content: "";
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            pointer-events: none;
-            background-color: var(--primary-bg);
-            background-image: var(--chat-bg-image);
-            background-size: cover;
-            background-position: center center;
-            background-repeat: no-repeat;
-            transition: background-color 0.5s ease;
-            will-change: transform;
-        }*/
+
         body::before {
             content: none; /* 废弃原来的伪元素背景方案 */
         }
@@ -542,7 +526,8 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 100%;
+            height: 100vh;         /* 加上这行 */
+            height: 100dvh;        /* 再加这行（现代手机专用防缩放） */
             z-index: -1;
             pointer-events: none;
             overflow: hidden;

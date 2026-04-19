@@ -146,7 +146,7 @@ autoSendInterval: 5,
 
                 item.onclick = (e) => {
                     if (e.target.closest('.bg-delete-btn')) return;
-                    applyBackground(bg.value);
+                    applyBackground(bg.value, settings.bgDisplayMode || 'contain');
                     safeSetItem(getStorageKey('chatBackground'), bg.value);
                     localforage.setItem(getStorageKey('chatBackground'), bg.value);
                     renderBackgroundGallery();
@@ -2698,7 +2698,18 @@ window.addEventListener('DOMContentLoaded', () => {
         if (layer && typeof settings !== 'undefined' && settings.bgDisplayMode) {
             layer.className = `mode-${settings.bgDisplayMode}`;
         }
-        
+        // 👇 防止手机打字时背景图被键盘挤小
+        if (window.visualViewport) {
+            let realHeight = window.visualViewport.height;
+            window.visualViewport.addEventListener('resize', () => {
+                if (window.visualViewport.height < realHeight) {
+                    layer.style.height = realHeight + 'px';
+                } else {
+                    layer.style.height = '';
+                    realHeight = window.visualViewport.height;
+                }
+            });
+        }
         // 👇 就是加这两行！页面加载完直接把按钮状态锁死
         const currentMode = settings.bgDisplayMode || 'contain';
         const containBtn = document.getElementById('bg-mode-contain');

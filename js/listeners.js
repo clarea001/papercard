@@ -1553,37 +1553,6 @@ document.getElementById('chat-settings').addEventListener('click', () => {
                 }, 100);
             });
 
-
-           /* const bgInput = document.getElementById('bg-gallery-input');
-            if (bgInput) {
-                bgInput.addEventListener('change', (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    if (file.size > 10 * 1024 * 1024) {
-                        showNotification('背景图片不能超过10MB', 'error');
-                        return;
-                    }
-                    if (file.size > 5 * 1024 * 1024) {
-                        showNotification('文件较大，正在处理中...', 'info', 2000);
-                    }
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const base64 = event.target.result;
-                        savedBackgrounds.push({
-                            id: `user-${Date.now()}`,
-                            type: file.type === 'image/gif' ? 'gif' : 'image',
-                            value: base64
-                        });
-                        saveBackgroundGallery();
-                        renderBackgroundGallery();
-                        applyBackground(base64);
-                        localforage.setItem(getStorageKey('chatBackground'), base64);
-                        showNotification('新背景已添加并应用', 'success');
-                    };
-                    reader.readAsDataURL(file);
-                    e.target.value = '';
-                });
-            }*/
            // ---------- 替换成这段 ----------
             const bgInput = document.getElementById('bg-gallery-input');
             if (bgInput) {
@@ -1599,7 +1568,7 @@ document.getElementById('chat-settings').addEventListener('click', () => {
                         savedBackgrounds.push({ id: `user-${Date.now()}`, type: 'image', value: base64 });
                         saveBackgroundGallery();
                         renderBackgroundGallery();
-                        applyBackground(base64);
+                        applyBackground(base64, settings.bgDisplayMode || 'contain');
                         localforage.setItem(getStorageKey('chatBackground'), base64);
                         showNotification('新背景已添加并应用', 'success');
                     }).catch(err => {
