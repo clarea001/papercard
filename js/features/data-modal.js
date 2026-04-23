@@ -475,22 +475,36 @@
     </div>
   </div>
 
-    <!-- 碎片整理 -->
+    <!-- 碎片整理 
     <div class="dm3-section"><i class="fas fa-broom"></i> 维护优化</div>
     <div class="dm3-group">
     <div class="dm3-row">
         <div class="dm3-icon dm3-icon-teal"><i class="fas fa-broom"></i></div>
         <div class="dm3-text">
-        <div class="dm3-row-title">深度清理与碎片整理</div>
-        <div class="dm3-row-desc">回收幽灵空间，解决数据少但卡顿的问题</div>
+        <div class="dm3-row-title">深度清理</div>
+        <div class="dm3-row-desc">清理不必要的垃圾数据</div>
         </div>
         <div class="dm3-right">
         <button class="dm3-btn solid" id="dm3-compact-btn">
-            <i class="fas fa-recycle"></i> 立即清理
+            <i class="fas fa-recycle"></i> 清理
         </button>
         </div>
     </div>
-    </div>
+    </div>-->
+		<!-- 存储优化与帮助 -->
+		<div class="dm3-section" style="margin-bottom:8px;"><i class="fas fa-lightbulb"></i> 存储与优化</div>
+		<div class="dm3-group" style="margin-bottom:14px;">
+			<div class="dm3-row tappable" id="dm3-open-faq">
+				<div class="dm3-icon dm3-icon-amber"><i class="fas fa-question-circle"></i></div>
+				<div class="dm3-text">
+					<div class="dm3-row-title">浏览器常见问题</div>
+				</div>
+				<div class="dm3-right">
+					<i class="fas fa-chevron-right" style="font-size:12px;color:var(--text-secondary);opacity:.5;"></i>
+				</div>
+			</div>
+		</div>
+
 
   <!-- 危险操作 -->
   <div class="dm3-section danger"><i class="fas fa-exclamation-triangle"></i> 危险操作</div>
@@ -533,8 +547,8 @@ function fmt(b) {
 async function updateStats() {
   try {
     const get = id => document.getElementById(id);
-    
-    // 1. 获取浏览器存储配额（异步）
+
+    // 1. 获取浏览器存储配额
     let quota = 0, usage = 0;
     if (navigator.storage && navigator.storage.estimate) {
       const estimate = await navigator.storage.estimate();
@@ -542,60 +556,61 @@ async function updateStats() {
       usage = estimate.usage || 0;
     }
 
-    // 2. 遍历 IndexedDB（精准分类版）
-    let textMsgSize = 0;     // 聊天记录（纯文字）
-    let mediaMsgSize = 0;    // 聊天记录里的图片/视频
-    let settingsSize = 0;    // 其他所有文本设置
-    let pureMediaSize = 0;   // 独立的媒体文件（背景图、表情、字体等）
-    
+    // 2. 遍历并精准分类
+    let textMsgSize = 0;
+    let mediaMsgSize = 0;
+    let settingsSize = 0;
+    let pureMediaSize = 0;
+
     try {
       const keys = await localforage.keys();
       for (const key of keys) {
         try {
           const rawValue = await localforage.getItem(key);
           
-          // 特殊处理：如果是纯正的 ArrayBuffer（比如老版单字体文件），直接算媒体
+          // 处理纯正的 ArrayBuffer
           if (rawValue instanceof ArrayBuffer) {
             pureMediaSize += rawValue.byteLength;
             continue;
           }
 
-          // 把数据转成字符串来称重
+          // ✨ 新增：如果是数组，且里面装的是原生 File/Blob（比如通话背景老版本残留）
+          if (Array.isArray(rawValue) && rawValue.length > 0 && (rawValue[0].file instanceof File || rawValue[0].file instanceof Blob)) {
+            for (const item of rawValue) {
+              if (item.file) pureMediaSize += (item.file.size || item.file.byteLength || 0);
+            }
+            continue;
+          }
+
+          // 正常的数据转字符串称重
           const str = typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue);
           if (!str) continue;
           const bytes = new Blob([str]).size;
 
-          // 判断是否是聊天记录
           const keyLower = key.toLowerCase();
           const isMsg = keyLower.includes('messages') || keyLower.includes('msgs');
 
           if (isMsg && Array.isArray(rawValue)) {
-            // 👇 核心：如果是聊天记录，我们逐条拆开算！
             for (const msg of rawValue) {
               if (!msg) continue;
               const msgStr = JSON.stringify(msg);
               const msgBytes = new Blob([msgStr]).size;
-              
-              // 如果这条消息有图片或视频，算作媒体聊天
               if (msg.image && msg.image.length > 100) {
                 mediaMsgSize += msgBytes;
-              } 
-              // 否则算作文字聊天
-              else {
+              } else {
                 textMsgSize += msgBytes;
               }
             }
           } else {
-            // 👇 不是聊天记录的数据（背景图、字体、设置等）
-            // 看看它里面包不包含大媒体特征
+            // Base64 或外链图片
             if (typeof str === 'string' && str.length > 500 && /data:(image|video)\//i.test(str)) {
               pureMediaSize += bytes;
             } 
-            // 看看它是不是字体列表（包含 buffer 属性）
+            // 带有 buffer 属性的字体对象
             else if (rawValue && typeof rawValue === 'object' && !Array.isArray(rawValue) && rawValue.buffer instanceof ArrayBuffer) {
               pureMediaSize += rawValue.buffer.byteLength;
             } 
-            // 剩下的全算设置和文本
+            // 剩下的纯文本设置
             else {
               settingsSize += bytes;
             }
@@ -608,7 +623,34 @@ async function updateStats() {
       console.warn('[dm3] IndexedDB 遍历失败:', e);
     }
 
-    // 3. 统计 localStorage（算进设置里）
+    // ✨ 补充：把单独存放在 IndexedDB 里的通话背景真实文件算进去
+    if (window.CallBgDB && CallBgDB.db) {
+      try {
+        const tx = CallBgDB.db.transaction(CallBgDB.storeName, 'readonly');
+        const store = tx.objectStore(CallBgDB.storeName);
+        const request = store.openCursor();
+        
+        await new Promise((resolve) => {
+          request.onsuccess = (e) => {
+            const cursor = e.target.result;
+            if (cursor) {
+              const file = cursor.value.file;
+              if (file) {
+                pureMediaSize += (file.size || file.byteLength || 0);
+              }
+              cursor.continue();
+            } else {
+              resolve();
+            }
+          };
+          request.onerror = () => resolve();
+        });
+      } catch (e) {
+        // 如果独立 DB 还没初始化或者出错了，直接忽略，不影响主流程
+      }
+    }
+
+    // 3. 统计 localStorage
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i) || '';
@@ -622,7 +664,7 @@ async function updateStats() {
     // 4. 汇总计算
     const totalText = textMsgSize + settingsSize;
     const totalMedia = mediaMsgSize + pureMediaSize;
-    const totalApp = totalText + totalMedia; // 实打实存进去的总和
+    const totalApp = totalText + totalMedia;
 
     // 5. 更新顶部的浏览器配额 UI
     const pct = quota > 0 ? Math.min(100, (usage / quota) * 100).toFixed(1) : 0;
@@ -642,20 +684,20 @@ async function updateStats() {
 
     // 6. 更新下面三个小框的数字
     const m = get('dm3-stat-msgs');
-    if (m) m.textContent = fmt(totalText); 
-    
+    if (m) m.textContent = fmt(totalText);
     const med = get('dm3-stat-media');
-    if (med) med.textContent = fmt(totalMedia); 
-    
+    if (med) med.textContent = fmt(totalMedia);
+    /*const c = get('dm3-stat-cfg');
+    const systemOverhead = Math.max(0, usage - totalApp);
+    if (c) c.textContent = fmt(systemOverhead);*/
     const c = get('dm3-stat-cfg');
-    // 用浏览器底层总占用，减去咱们算出来的真实数据，剩下的就是系统黑盒占用
-    const systemOverhead = Math.max(0, usage - totalApp); 
-    if (c) c.textContent = fmt(systemOverhead); 
+    // 既然图片和文字的统计可能会因为底层锁而不准，
+    // 我们就把“算不明的差额”直接标记为底层开销，但不允许出现负数
+    const calcAppTotal = totalText + totalMedia;
+    const realOverhead = usage > calcAppTotal ? (usage - calcAppTotal) : 0;
+    if (c) c.textContent = fmt(realOverhead);
 
-
-    // 控制台真实打印，方便你对照
     console.log(`[dm3] 精准统计: 纯文字=${fmt(textMsgSize)}, 文本设置=${fmt(settingsSize)}, 图片媒体=${fmt(totalMedia)}, 实际总占=${fmt(totalApp)} | 浏览器底层占用=${fmt(usage)}`);
-
   } catch (e) {
     console.error('[dm3] 统计失败:', e);
     const get = id => document.getElementById(id);
@@ -665,6 +707,7 @@ async function updateStats() {
     if (bar) bar.style.width = '0%';
   }
 }
+
 
     /* ── Sync toggles ─────────────────────────────────────────────── */
     function syncToggles() {
@@ -772,82 +815,155 @@ function bindExportImportEvents() {
         });
     }
       // ================= 智能垃圾回收大师（绝对不删用户数据版） =================
-  const compactBtn = document.getElementById('dm3-compact-btn');
-  if (compactBtn) {
-    compactBtn.addEventListener('click', async () => {
-      compactBtn.disabled = true;
-      compactBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 深度扫描中...';
+   /* const compactBtn = document.getElementById('dm3-compact-btn');
+    if (compactBtn) {
+      compactBtn.addEventListener('click', async () => {
+    compactBtn.disabled = true;
+    compactBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 深度扫描中...';
+    let garbageSize = 0;
+    const cleanDetails = [];
 
-      let garbageSize = 0;
-      const cleanDetails = [];
-
-      try {
-        // ========== 第一步：抓取未经压缩的冗余缓存（老版本字体文件） ==========
-        const oldBase64Key = `${window.APP_PREFIX || 'CHAT_APP_V3_'}local_font_base64`;
-        const oldBase64Data = await localforage.getItem(oldBase64Key);
-        if (oldBase64Data && typeof oldBase64Data === 'string' && oldBase64Data.length > 100) {
-          garbageSize += new Blob([oldBase64Data]).size;
-          cleanDetails.push(`清理旧版字体缓存 (${(new Blob([oldBase64Data]).size / (1024 * 1024)).toFixed(1)} MB)`);
-          await localforage.removeItem(oldBase64Key);
-        }
-
-        // ========== 第二步：抓取孤立的老版单字体 Blob ==========
-        const oldBlobKey = `${window.APP_PREFIX || 'CHAT_APP_V3_'}local_font_blob`;
-        const newFontList = await localforage.getItem(`${window.APP_PREFIX || 'CHAT_APP_V3_'}local_font_list`) || [];
-        if (newFontList.length > 0) {
-          const oldBlobData = await localforage.getItem(oldBlobKey);
-          if (oldBlobData) {
-            garbageSize += oldBlobData instanceof Blob ? oldBlobData.size : (oldBlobData.byteLength || 0);
-            cleanDetails.push('清理孤立的老版单字体文件');
-            await localforage.removeItem(oldBlobKey);
-          }
-        }
-
-        // ========== 第三步：强制回收内存里的幽灵 Blob 链接 ==========
-        if (window._blobUrls && window._blobUrls.length > 0) {
-          cleanDetails.push(`回收 ${window._blobUrls.length} 个幽灵图片链接`);
-          window._blobUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch(e) {} });
-          window._blobUrls = [];
-        }
-
-        // ========== 第四步：强制触发 IndexedDB 底层碎片整理（核心黑科技） ==========
-        try {
-          if (window.localforage && window.localforage._dbInfo && window.localforage._dbInfo.db) {
-            const dbInstance = window.localforage._dbInfo.db;
-            if (dbInstance && typeof dbInstance.close === 'function') {
-              dbInstance.close(); // 必须先关闭，底层才能去硬盘上擦除被删文件的尸体
+    try {
+      // ========== 真正的第一步：清理孤立的通话背景和表情包尸体 ==========
+      if (window.callBgLibrary && window.CallBgDB && CallBgDB.db) {
+        // 拿出当前正在用的背景 ID
+        const validBgIds = new Set(callBgLibrary.map(b => b.id));
+        const tx = CallBgDB.db.transaction(CallBgDB.storeName, 'readonly');
+        const store = tx.objectStore(CallBgDB.storeName);
+        const request = store.openCursor();
+        
+        await new Promise((resolve) => {
+          request.onsuccess = async (e) => {
+            const cursor = e.target.result;
+            if (cursor) {
+              // 如果这个文件不在当前列表里，说明是被删掉的尸体
+              if (!validBgIds.has(cursor.value.id)) {
+                const file = cursor.value.file;
+                const size = file ? (file.size || file.byteLength || 0) : 0;
+                garbageSize += size;
+                if (size > 0) cleanDetails.push(`清理废弃通话背景 (${(size / (1024 * 1024)).toFixed(1)} MB)`);
+                
+                // 异步删除尸体（用另一个事务，避免锁死游标）
+                const delTx = CallBgDB.db.transaction(CallBgDB.storeName, 'readwrite');
+                delTx.objectStore(CallBgDB.storeName).delete(cursor.value.id);
+              }
+              cursor.continue();
+            } else {
+              resolve();
             }
-          }
-          await localforage.ready(); // 重新初始化连接，这步会自动触发浏览器的 VACUUM 机制
-          cleanDetails.push('已触发底层碎片整理 (VACUUM)');
-        } catch (e) {
-          console.warn('[清理] 碎片整理跳过:', e);
-        }
-
-        // ========== 第五步：强制触发 JS 垃圾回收（清理 DOM 渲染层残留） ==========
-        if (window.gc) { window.gc(); } 
-        else { const tmp = []; for (let i = 0; i < 100; i++) tmp.push(new ArrayBuffer(1024)); tmp.length = 0; }
-
-        // ========== 汇总报告 ==========
-        if (garbageSize > 0 || cleanDetails.length > 0) {
-          const sizeStr = garbageSize > 0 ? `释放了 ${(garbageSize / (1024 * 1024)).toFixed(1)} MB 隐藏缓存` : '已优化底层结构';
-          showNotification(` ${sizeStr}，正在自动刷新...`, 'success', 2000);
-        } else {
-          showNotification('✅ 您的存储非常干净，2秒后刷新', 'success', 2000);
-        }
-
-        // 不管有没有清出垃圾，只要点了清理，底层都重置过了，直接无感刷新
-        setTimeout(() => { window.location.reload(); }, 2500);
-
-      } catch (err) {
-        console.error('清理失败:', err);
-        showNotification('清理过程遇到错误，但不影响您的数据安全', 'error');
-      } finally {
-        compactBtn.disabled = false;
-        compactBtn.innerHTML = '<i class="fas fa-recycle"></i> 立即清理';
+          };
+          request.onerror = () => resolve();
+        });
       }
-    });
-  }
+
+      // ========== 真正的第二步：清理旧版冗余缓存 ==========
+      const oldBase64Key = `${window.APP_PREFIX || 'CHAT_APP_V3_'}local_font_base64`;
+      const oldBase64Data = await localforage.getItem(oldBase64Key);
+      if (oldBase64Data && typeof oldBase64Data === 'string' && oldBase64Data.length > 100) {
+        garbageSize += new Blob([oldBase64Data]).size;
+        cleanDetails.push(`清理旧版字体缓存`);
+        await localforage.removeItem(oldBase64Key);
+      }
+
+      // ========== 汇总报告 ==========
+      if (garbageSize > 0) {
+        showNotification(`🧹 真正释放了 ${(garbageSize / (1024 * 1024)).toFixed(1)} MB 硬盘空间，正在刷新...`, 'success', 2500);
+      } else {
+        showNotification('✅ 扫描完毕，没有发现废弃的媒体尸体', 'success', 2000);
+      }
+
+      // 刷新页面让浏览器真正释放文件锁
+      setTimeout(() => window.location.reload(), 1000);
+
+    } catch (err) {
+      console.error('清理失败:', err);
+      showNotification('清理过程遇到错误', 'error');
+      compactBtn.disabled = false;
+      compactBtn.innerHTML = '<i class="fas fa-recycle"></i> 清理';
+    }
+  });
+  }*/
+	// ================= 浏览器存储 FAQ 弹窗 =================
+	const faqTrigger = document.getElementById('dm3-open-faq');
+	if (faqTrigger) {
+		faqTrigger.addEventListener('click', () => {
+			// 如果已经打开了就忽略
+			if (document.getElementById('dm3-faq-modal')) return;
+
+			const overlay = document.createElement('div');
+			overlay.id = 'dm3-faq-modal';
+			overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;animation:dm3FadeIn .2s ease;';
+			
+			// 定义 FAQ 列表（后续要加新问题，直接在这个数组里加对象就行）
+			const faqList = [
+				{
+					q: '关于“系统占用”',
+					a: '删除图片或视频后，浏览器底层会保留“碎片文件”导致空间无法立刻释放。若“系统占用”数据持续过高，建议通过：<b>清除浏览器缓存</b>，或<b>全量备份导出 → 清除浏览器本站数据 → 重新导入</b>，即可腾出可用空间。'
+				},
+				{
+					q: '关于“数据突然没了或网页自动刷新或闪退，或网页卡顿”',
+					a: '通常是因为浏览器或手机的内存不足，无法同时处理大量数据（如加载页面、图片、聊天记录）导致的。手机或电脑的运行内存（RAM）被占满后，系统会自动关闭占用资源最高的应用，导致页面刷新或退出。这是浏览器的自我保护机制。建议<b>使用正常模式浏览或更换浏览器，并避免同时开太多标签页。</b>'
+				},
+				{
+					q: '关于“milk网站导出数据的不兼容性或数据膨胀”',
+					a: '因为导出的文件中可能包含了大量冗余数据（例如将所有图片直接编码为冗长的文本）。这会导致一个原本只有 20MB 的数据膨胀到 200MB。尝试导入这种臃肿文件时，浏览器内存极易被撑爆，从而导致页面卡顿或崩溃。建议<b>只导入由本站导出的备份文件。</b>'
+				},
+        {
+					q: '关于“后台消息推送”',
+					a: '即使你开启了浏览器通知权限，网页要在后台发通知，必须依赖一项叫 Service Worker（后台服务）的技术。但目前的安卓系统和手机厂商（如华为、小米、OPPO等）为了防止流氓软件，不仅会杀后台，还会在系统底层直接拦截浏览器的这种后台唤醒行为。这就导致即使权限全开，系统也会把网页发通知的动作“静默拦截”掉。如果你想收到通知，建议<b>使用电脑浏览器访问，或更换为对后台支持更友好的手机浏览器</b>。'
+				},
+        {
+					q: '关于“进不去本网站”',
+					a: '这是因为网站托管在GitHub Pages上，该平台在全球的访问稳定性会受地区网络环境影响。部分网络环境下，可能会遇到页面加载失败等问题。如果无法打开本网站，建议<b>尝试切换网络（如使用移动数据）、更换浏览器</b>，或稍后再试。'
+				}
+			];
+
+		// 拼装 HTML 内容
+			let faqHtml = '';
+			faqList.forEach(item => {
+				faqHtml += `
+					<div style="margin-bottom:16px;">
+						<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">
+							<i class="fas fa-lightbulb" style="color:var(--accent-color);margin-top:3px;font-size:12px;flex-shrink:0;"></i>
+							<div style="font-size:13.5px;font-weight:700;color:var(--text-primary);line-height:1.4;">${item.q}</div>
+						</div>
+						<div style="font-size:12.5px;color:var(--text-secondary);line-height:1.65;padding-left:20px;opacity:.85;">${item.a}</div>
+					</div>
+				`;
+			});
+
+			overlay.innerHTML = `
+				<div style="background:var(--primary-bg);border-radius:20px;width:100%;max-width:420px;max-height:75dvh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+					<div style="padding:18px 20px 14px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;gap:12px;flex-shrink:0;">
+						<div style="width:36px;height:36px;border-radius:12px;background:rgba(255,159,10,.12);display:flex;align-items:center;justify-content:center;color:#FF9F0A;font-size:15px;flex-shrink:0;">
+							<i class="fas fa-book-open"></i>
+						</div>
+						<div style="flex:1;font-size:16px;font-weight:800;color:var(--text-primary);">浏览器常见问题</div>
+						<button id="dm3-faq-close" style="width:30px;height:30px;border-radius:50%;border:none;background:var(--secondary-bg);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">
+							<i class="fas fa-times"></i>
+						</button>
+					</div>
+					<div style="flex:1;overflow-y:auto;padding:18px 20px 20px;-webkit-overflow-scrolling:touch;">
+						${faqHtml}
+					</div>
+				</div>
+			`;
+
+			document.body.appendChild(overlay);
+
+			// 绑定关闭事件
+			const closeBtn = document.getElementById('dm3-faq-close');
+			const closeModal = () => {
+				overlay.style.opacity = '0';
+				overlay.style.transition = 'opacity .15s';
+				setTimeout(() => overlay.remove(), 150);
+			};
+			closeBtn.addEventListener('click', closeModal);
+			overlay.addEventListener('click', (e) => {
+				if (e.target === overlay) closeModal();
+			});
+		});
+	}
 
 }
 

@@ -10222,45 +10222,6 @@ html[data-theme="dark"] .period-stat-value { color: var(--accent-color-dark); }
     display: flex;
 }
 
-/* 日间/夜间切换开关 */
-.theme-switch {
-    position: relative;
-    display: inline-block;
-    width: 50px;
-    height: 28px;
-}
-.theme-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-.theme-switch-slider {
-    position: absolute;
-    cursor: pointer;
-    inset: 0;
-    background: var(--border-color);
-    border-radius: 28px;
-    transition: 0.3s;
-}
-.theme-switch-slider::before {
-    position: absolute;
-    content: "";
-    height: 22px;
-    width: 22px;
-    left: 3px;
-    bottom: 3px;
-    background: white;
-    border-radius: 50%;
-    transition: 0.3s;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-.theme-switch input:checked + .theme-switch-slider {
-    background: var(--accent-color);
-}
-.theme-switch input:checked + .theme-switch-slider::before {
-    transform: translateX(22px);
-}
-
 /* =========================================
    截图功能模态框样式 (补全)
    ========================================= */
@@ -10985,8 +10946,8 @@ html[data-theme="dark"] .period-stat-value { color: var(--accent-color-dark); }
   content: '';
   position: absolute;
   left: 24px;
-  top: 0;
-  bottom: 0;
+  top: 4px;
+  bottom: 4px;
   width: 1px;
   background: rgba(220, 80, 80, 0.2);
 }
@@ -11045,6 +11006,7 @@ html[data-theme="dark"] .period-stat-value { color: var(--accent-color-dark); }
   flex: 1;
   height: 1px;
   background: linear-gradient(90deg, rgba(var(--accent-color-rgb), 0.25), transparent);
+
 }
 
 .board-reply-text {
@@ -11062,8 +11024,8 @@ html[data-theme="dark"] .period-stat-value { color: var(--accent-color-dark); }
   content: '';
   position: absolute;
   left: 24px;
-  top: 0;
-  bottom: 0;
+  top: 4px;
+  bottom: 4px;
   width: 1px;
   background: rgba(220, 80, 80, 0.2);
 }
@@ -11184,6 +11146,18 @@ html[data-theme="dark"] .period-stat-value { color: var(--accent-color-dark); }
     opacity: 0.5;
     margin: 12px 0;
     user-select: none;
+}
+/* 留言板导出格式弹窗专用遮罩 */
+.modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background-color: rgba(0, 0, 0, 0.6) !important;
+    z-index: 2000 !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 /* ================================================

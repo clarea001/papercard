@@ -8,6 +8,9 @@ let currentThreadId = null;
 let currentComposeMode = null;
 let currentComposeType = null;
 let selectedImage = null;
+let isMultiSelectMode = false;
+let selectedThreadIds = new Set();
+
 
 // --- 完全隔离的底层数据与配置 ---
 let boardData = {
@@ -263,7 +266,52 @@ function initModals() {
 function bindStaticEvents() {
   // --- 列表层 ---
   document.getElementById('board-list-close-btn').onclick = () => hideModal(document.getElementById('envelope-board-modal'));
-  document.getElementById('board-export-btn').onclick = () => window._bv2_exportTxt(currentView);
+  //document.getElementById('board-export-btn').onclick = () => window._bv2_exportTxt(currentView);
+// 把原来的导出按钮事件删掉，换成这个
+document.getElementById('board-export-btn').onclick = () => {
+    isMultiSelectMode = true;
+    selectedThreadIds.clear();
+    switchTab(currentView); // 刷新列表，触发多选样式
+};
+
+// 绑定多选操作栏的按钮
+/*document.getElementById('board-cancel-select-btn').onclick = exitMultiSelectMode;
+document.getElementById('board-select-all-btn').onclick = () => {
+    const threads = currentView === 'me' ? boardData.myThreads : boardData.partnerThreads;
+    threads.forEach(t => selectedThreadIds.add(t.id));
+    switchTab(currentView);
+};*/
+/*document.getElementById('board-confirm-select-btn').onclick = () => {
+    if (selectedThreadIds.size === 0) {
+        if(typeof showNotification === 'function') showNotification('请至少选择一条留言', 'warning');
+        return;
+    }
+    document.getElementById('board-format-modal').style.display = 'flex';
+};*/
+/*document.getElementById('board-confirm-select-btn').onclick = () => {
+    if (selectedThreadIds.size === 0) {
+        if(typeof showNotification === 'function') showNotification('请至少选择一条留言', 'warning');
+        return;
+    }
+    // 不要用 style.display，用系统原生的弹窗函数，防止 DOM 找不到
+    if (typeof showModal === 'function') {
+        showModal(document.getElementById('board-format-modal'));
+    } else {
+        document.getElementById('board-format-modal').style.display = 'flex';
+    }
+};*/
+document.getElementById('final-export-cancel').onclick = () => {
+    document.getElementById('board-format-modal').style.display = 'none';
+};
+/*document.getElementById('final-export-txt').onclick = () => {
+    document.getElementById('board-format-modal').style.display = 'none';
+    window._bv2_exportSelected('txt'); 
+};
+document.getElementById('final-export-img').onclick = () => {
+    document.getElementById('board-format-modal').style.display = 'none';
+    window._bv2_exportSelected('img');
+};*/
+
   document.getElementById('board-new-post-btn').onclick = () => window._bv2_openCompose('new', null, 'me');
 
   // --- 详情层 ---
@@ -279,14 +327,33 @@ function bindStaticEvents() {
   document.getElementById('board-edit-save-btn').onclick = () => window._bv2_saveGlobalEdit();
 
   // --- 撰写层 ---
-  document.getElementById('board-compose-close-btn').onclick = () => {
+  /*document.getElementById('board-compose-close-btn').onclick = () => {
     hideModal(document.getElementById('board-compose-modal'));
     showModal(document.getElementById('board-detail-modal'));
   };
   document.getElementById('board-compose-cancel-btn').onclick = () => {
     hideModal(document.getElementById('board-compose-modal'));
     showModal(document.getElementById('board-detail-modal'));
+  };*/
+  document.getElementById('board-compose-close-btn').onclick = () => {
+      hideModal(document.getElementById('board-compose-modal'));
+      // 如果不是从详情页进来的（即新建留言），就回列表；否则回详情
+      if (!window._bv2_composeFromDetail) {
+          showModal(document.getElementById('envelope-board-modal'));
+      } else {
+          showModal(document.getElementById('board-detail-modal'));
+      }
   };
+  document.getElementById('board-compose-cancel-btn').onclick = () => {
+      hideModal(document.getElementById('board-compose-modal'));
+      // 同样的判断逻辑
+      if (!window._bv2_composeFromDetail) {
+          showModal(document.getElementById('envelope-board-modal'));
+      } else {
+          showModal(document.getElementById('board-detail-modal'));
+      }
+  };
+
   document.getElementById('board-compose-send-btn').onclick = () => window._bv2_submitPost();
   document.getElementById('bv2-compose-img-input').onchange = (e) => window._bv2_handleImgSelect(e);
 
@@ -372,9 +439,16 @@ function switchTab(type) {
             ${partnerName}${boardData.partnerThreads.some(t => t.unread) ? '<span style="position:absolute;top:-6px;right:-6px;font-size:14px;">✨</span>' : ''}
         </button>
     </div>`;
-    tabArea.querySelectorAll('[data-tab]').forEach(btn => {
+    /*tabArea.querySelectorAll('[data-tab]').forEach(btn => {
         btn.onclick = () => switchTab(btn.dataset.tab);
+    });*/
+    tabArea.querySelectorAll('[data-tab]').forEach(btn => {
+        btn.onclick = () => {
+            if (isMultiSelectMode) exitMultiSelectMode(); // <--- 加上这句
+            switchTab(btn.dataset.tab);
+        };
     });
+
 
   // --- 列表内容 ---
     const listBody = document.getElementById('board-list-body');
@@ -390,15 +464,43 @@ function switchTab(type) {
         }
         const preview = t.replies[0] ? (t.replies[0].image ? '🖼 图片留言' : escapeHtml((t.replies[0].text || '').substring(0, 40))) : '';
         const unreadStar = t.unread ? '<span style="position:absolute;top:12px;right:12px;font-size:14px;z-index:2;">✨</span>' : '';
-        return `<div class="board-card" data-thread-id="${t.id}" style="position:relative;cursor:pointer;">${unreadStar}<div class="board-card-top-line"></div><div class="board-card-body"><div class="board-card-preview">${preview}</div><div class="board-card-meta"><span class="board-card-date">${formatTime(t.createdAt)}</span><span class="board-card-status ${statusClass}">${statusText}</span></div></div></div>`;
+        //return `<div class="board-card" data-thread-id="${t.id}" style="position:relative;cursor:pointer;">${unreadStar}<div class="board-card-top-line"></div><div class="board-card-body"><div class="board-card-preview">${preview}</div><div class="board-card-meta"><span class="board-card-date">${formatTime(t.createdAt)}</span><span class="board-card-status ${statusClass}">${statusText}</span></div></div></div>`;
+        return `<div class="board-card" data-thread-id="${t.id}" style="position:relative;cursor:pointer;${isMultiSelectMode && selectedThreadIds.has(t.id) ? 'border:2px solid var(--accent-color);' : ''}">${unreadStar}<div class="board-card-top-line"></div><div class="board-card-body"><div class="board-card-preview">${preview}</div><div class="board-card-meta"><span class="board-card-date">${formatTime(t.createdAt)}</span><span class="board-card-status ${statusClass}">${statusText}</span></div></div></div>`;
+
       }).join('');
+      // 自己绑定点击事件，不再依赖 HTML 的 onclick
       listBody.querySelectorAll('[data-thread-id]').forEach(card => {
-        card.onclick = () => window._bv2_openDetail(card.dataset.threadId, currentView);
+          card.onclick = () => {
+              const tid = card.dataset.threadId;
+              if (isMultiSelectMode) {
+                  // --- 核心攻克：确保多选池子被真正激活 ---
+                  if (!selectedThreadIds) selectedThreadIds = new Set();
+                  if (selectedThreadIds.has(tid)) selectedThreadIds.delete(tid);
+                  else selectedThreadIds.add(tid);
+                  // --- 攻克结束 ---
+                  switchTab(currentView);
+              } else {
+                  openDetail(tid, currentView);
+              }
+          };
       });
     }
 
     // --- 底部按钮 ---
-    listFooter.style.display = isMe ? '' : 'none';
+    //listFooter.style.display = isMe ? '' : 'none';
+    // 找到原本的 listFooter.style.display = isMe ? '' : 'none';
+// 替换成下面这段：
+const newPostBtn = document.getElementById('board-new-post-btn');
+const multiBar = document.getElementById('board-multi-select-bar');
+if (isMultiSelectMode) {
+    newPostBtn.style.display = 'none';
+    multiBar.style.display = 'flex';
+    document.getElementById('board-selected-count').textContent = `已选 ${selectedThreadIds.size} 条`;
+} else {
+    newPostBtn.style.display = isMe ? 'flex' : 'none';
+    multiBar.style.display = 'none';
+}
+
   }
 
 function openDetail(threadId, type) {
@@ -421,13 +523,18 @@ function openDetail(threadId, type) {
       const isStarter = idx === 0;
       let cHtml = '';
       if (r.text) cHtml += `<div class="${isSenderMe ? 'board-user-text' : 'board-reply-text'}" id="bv2-text-${r.id}">${escapeHtml(r.text)}</div>`;
-      if (r.image) cHtml += `<div id="bv2-img-${r.id}" style="display:inline-block; position:relative; margin-bottom:8px; margin-left:40px;"><img src="${r.image}" style="max-width:150px;border-radius:8px;display:block;cursor:pointer;" onclick="viewImage('${r.image}')"></div>`;
-      if (r.sticker) cHtml += `<img src="${r.sticker}" style="max-width:120px;border-radius:8px;display:block;margin-top:8px;margin-left:40px;">`;
+      if (r.image) cHtml += `<div id="bv2-img-${r.id}" class="${isSenderMe ? 'board-user-text' : 'board-reply-text'}" style="display:inline-block; position:relative; margin-bottom:8px;"><img src="${r.image}" style="max-width:150px;border-radius:8px;display:block;cursor:pointer;" onclick="viewImage('${r.image}')"></div>`;
       if (r.stickers && r.stickers.length > 0) {
-        cHtml += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; margin-left:40px;">';
-        r.stickers.forEach(st => { cHtml += `<img src="${st}" style="max-width:120px; max-height:120px; border-radius:8px;">`; });
-        cHtml += '</div>';
+          // 先用一个 position:relative 的盒子包住（用来给红线定位）
+          cHtml += `<div style="position:relative; display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;margin-bottom:8px; padding-left:40px;">`;
+
+          r.stickers.forEach(st => {
+              cHtml += `<img src="${st}" style="max-width:120px; max-height:120px; border-radius:8px; object-fit:contain;">`;
+          });
+          cHtml += '</div>';
       }
+
+
 
       const sectionClass = isStarter ? 'board-user-section' : 'board-reply-section';
       const labelClass = isStarter ? 'board-user-label' : 'board-reply-label';
@@ -507,6 +614,7 @@ function openCompose(mode, threadId, type) {
   currentComposeMode = mode;
   currentThreadId = threadId;
   currentComposeType = type;
+  window._bv2_composeFromDetail = (mode !== 'new'); 
   selectedImage = null;
   const titleMap = { new: '写新留言', continue: '继续留言', reply: '回复Ta' };
   document.getElementById('board-compose-title-text').textContent = titleMap[mode] || '写新留言';
@@ -622,18 +730,149 @@ async function deleteThread(id, type) {
   if(typeof showNotification === 'function') showNotification('已删除', 'success');
 }
 
-function exportTxt(type) {
-  if (!confirm('确定要导出留言记录为 TXT 文件吗？')) return;
-  const threads = type === 'me' ? boardData.myThreads : boardData.partnerThreads;
-  if (threads.length === 0) { if(typeof showNotification === 'function') showNotification('没有可导出的内容', 'info'); return; }
-  const myName = (typeof settings !== 'undefined' && settings.myName) || '我';
-  const partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '对方';
-  let txt = `========================\n【${type === 'me' ? '我的' : 'Ta的'}留言板】\n========================\n\n`;
-  threads.forEach(t => { t.replies.forEach(r => { txt += `[${new Date(r.timestamp).toLocaleString('zh-CN')}]\n${r.sender === 'me' ? myName : partnerName}: ${r.image ? '[图片]\n' : ''}${r.text || ''}${r.sticker ? '[表情包]\n' : ''}\n`; }); txt += '------------------------\n\n'; });
-  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' }); const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = `留言板-${new Date().toLocaleDateString()}.txt`; a.click();
-  if(typeof showNotification === 'function') showNotification('导出成功', 'success');
+function exitMultiSelectMode() {
+    isMultiSelectMode = false;
+    selectedThreadIds.clear();
+    switchTab(currentView);
 }
+
+function getSelectedThreads() {
+    const allThreads = currentView === 'me' ? boardData.myThreads : boardData.partnerThreads;
+    return allThreads.filter(t => selectedThreadIds.has(t.id));
+}
+
+function exportSelected(format) {
+  document.getElementById('board-format-modal').style.display = 'none'; // <--- 加上这一句，点完就关掉选择框
+    const selectedThreads = getSelectedThreads();
+    if (selectedThreads.length === 0) return;
+    
+    exitMultiSelectMode(); // 导出后退出多选模式
+
+    if (format === 'txt') {
+        exportThreadsToTxt(selectedThreads);
+    } else {
+        exportThreadsToImg(selectedThreads);
+    }
+}
+
+// 纯净版 TXT 导出（只导出选中的）
+function exportThreadsToTxt(threads) {
+    const myName = (typeof settings !== 'undefined' && settings.myName) || '我';
+    const partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '对方';
+    const isMe = currentView === 'me';
+    let txt = `========================\n【${isMe ? '我的' : partnerName + '的'}留言板（部分导出）】\n========================\n\n`;
+    
+    threads.forEach(t => {
+        t.replies.forEach((r, idx) => {
+            txt += `[${new Date(r.timestamp).toLocaleString('zh-CN')}]\n${r.sender === 'me' ? myName : partnerName}: ${r.image ? '[图片]\n' : ''}${r.text || ''}\n`;
+            const isLast = idx === t.replies.length - 1;
+            const nextIsPartner = t.replies[idx + 1]?.sender === 'partner';
+            if (!isMe && isLast && r.sender === 'partner' && r.liked) txt += `[系统提示] ${myName} 赞了 ${partnerName} 的留言\n`;
+            else if (!isMe && !isLast && r.sender === 'partner' && r.liked && t.replies[idx + 1]?.sender === 'me') txt += `[系统提示] ${myName} 赞了 ${partnerName} 的留言\n`;
+            else if (r.sender === 'me' && r.liked && nextIsPartner) txt += `[系统提示] ${partnerName} 赞了 ${myName} 的留言\n`;
+        });
+        txt += '------------------------\n\n';
+    });
+    
+    const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `留言板记录-${new Date().toLocaleDateString()}.txt`;
+    a.click();
+    if(typeof showNotification === 'function') showNotification('TXT导出成功', 'success');
+}
+
+// 纯净版 图片导出（只导出选中的，保持留言板样式）
+async function exportThreadsToImg(threads) {
+    if (typeof html2canvas === 'undefined') {
+        if(typeof showNotification === 'function') showNotification('缺少截图组件', 'warning');
+        return;
+    }
+    if(typeof showNotification === 'function') showNotification('正在生成图片，请稍候...', 'info', 3000);
+
+    const myName = (typeof settings !== 'undefined' && settings.myName) || '我';
+    const partnerName = (typeof settings !== 'undefined' && settings.partnerName) || '对方';
+    const isMe = currentView === 'me';
+
+        // 1. 像截图.js一样，提前算出真实颜色和背景
+        const cs = getComputedStyle(document.documentElement);
+        const realBg = cs.getPropertyValue('--primary-bg').trim() || '#ffffff';
+        const realText = cs.getPropertyValue('--text-primary').trim() || '#1a1a1a';
+        const realSec = cs.getPropertyValue('--text-secondary').trim() || '#7a7a7a';
+        const realBorder = cs.getPropertyValue('--border-color').trim() || '#ebebeb';
+        const accentRgb = cs.getPropertyValue('--accent-color-rgb').trim() || '197, 164, 126';
+        const realAccent = cs.getPropertyValue('--accent-color').trim() || '#c5a47e';
+
+        // 2. 建容器，只上一个纯色背景，干干净净
+        const renderBox = document.createElement('div');
+        renderBox.style.cssText = `
+            position:fixed; left:-9999px; top:0; width:375px; padding:20px; z-index:-9999;
+            background-color: ${realBg};
+        `;
+        document.body.appendChild(renderBox);
+        // 3. 拼 HTML，卡片用 secondary-bg 稍微区分一下层次感
+        let html = `<div style="text-align:center; font-size:16px; font-weight:bold; margin-bottom:16px; color:${realText};">${isMe ? '我的' : partnerName + '的'}留言板</div>`;
+        
+        threads.forEach(t => {
+            // 留言卡片：加上 secondary-bg 的底色，看起来像一张张白纸
+            html += `<div style="background-color:${cs.getPropertyValue('--secondary-bg').trim() || '#ffffff'}; border-radius:12px; padding:16px; margin-bottom:20px; border:1px solid${realBorder}; position:relative; overflow:hidden;">`;
+            
+            // 顶部保留那条彩色线，拉满仪式感
+            html += `<div style="position:absolute; top:0; left:0; right:0; height:4px; background:${realAccent};"></div>`;
+            
+            
+
+            t.replies.forEach((r, idx) => {
+            const isSenderMe = r.sender === 'me';
+            let cHtml = '';
+            if (r.text) cHtml += `<div class="${isSenderMe ? 'board-user-text' : 'board-reply-text'}">${escapeHtml(r.text)}</div>`;
+            if (r.image) cHtml += `<div id="bv2-img-${r.id}" class="${isSenderMe ? 'board-user-text' : 'board-reply-text'}" style="display:inline-block; position:relative; margin-bottom:8px;"><img src="${r.image}" style="max-width:150px;border-radius:8px;display:block;cursor:pointer;" onclick="viewImage('${r.image}')"></div>`;
+            // 大概在 exportThreadsToImg 函数里面，找到这段：
+            if (r.stickers && r.stickers.length > 0) {
+                
+                cHtml += `<div style="position:relative; display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;margin-bottom:8px; padding-left:40px;">`;
+
+                r.stickers.forEach(st => {
+                    cHtml += `<img src="${st}" style="max-width:120px; max-height:120px; border-radius:8px; object-fit:contain;">`;
+                });
+                cHtml += '</div>';
+            }
+            html += `<div class="${idx === 0 ? 'board-user-section' : 'board-reply-section'}"><div class="${idx === 0 ? 'board-user-label' : 'board-reply-label'}">${isSenderMe ? myName : partnerName}${idx === 0 ? ' 的留言' : ' 的回复'}</div>${cHtml}</div>`;
+            
+            const isLast = idx === t.replies.length - 1;
+            const nextIsPartner = t.replies[idx + 1]?.sender === 'partner';
+            if (!isMe && isLast && r.sender === 'partner' && r.liked) html += `<div class="board-system-hint">${myName} 赞了 ${partnerName} 的留言</div>`;
+            else if (!isMe && !isLast && r.sender === 'partner' && r.liked && t.replies[idx + 1]?.sender === 'me') html += `<div class="board-system-hint">${myName} 赞了 ${partnerName} 的留言</div>`;
+            else if (r.sender === 'me' && r.liked && nextIsPartner) html += `<div class="board-system-hint">${partnerName} 赞了 ${myName} 的留言</div>`;
+        });
+        html += `</div>`;
+        html += `<div style="font-size:12px; color:${realSec}; margin-bottom:12px;text-align: right;">${new Date(t.createdAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}</div>`;
+    });
+    renderBox.innerHTML = html;
+
+    // 3. 截图下载
+    try {
+        const canvas = await html2canvas(renderBox, {
+            useCORS: true,      // 允许跨域图片（网络表情包）
+            allowTaint: true,   // 允许绘制污染的画布（本地上传图）
+            backgroundColor: null, 
+            scale: 3, 
+            logging: false 
+        });
+        const link = document.createElement('a');
+        link.download = `留言板记录-${new Date().toLocaleDateString()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        if(typeof showNotification === 'function') showNotification('图片导出成功', 'success');
+    } catch (err) {
+        console.error(err);
+        if(typeof showNotification === 'function') showNotification('导出失败，可能存在跨域图片', 'warning');
+    } finally {
+        document.body.removeChild(renderBox);
+    }
+}
+
+
 // 点击铅笔：全页面进入编辑，隐藏干扰按钮
 window._bv2_toggleGlobalEdit = function() {
   const threads = currentView === 'me' ? boardData.myThreads : boardData.partnerThreads;
@@ -835,22 +1074,38 @@ function restoreDetailViewUI() {
   if (hint) hint.remove();
 }
 
-// --- 暴露全局接口 ---
+// --- 对外只暴露入口和设置，其余全在墙内自己消化 ---
 window.loadEnvelopeData = loadData;
 window.checkEnvelopeStatus = checkStatus;
-window._bv2_switchTab = switchTab; window._bv2_openDetail = openDetail;
-window._bv2_openCompose = openCompose; window._bv2_handleImgSelect = handleImgSelect;
-window._bv2_submitPost = submitPost; 
-window._bv2_editText = editText;
-window._bv2_saveEdit = saveEdit;
-window._bv2_cancelEdit = cancelEdit;
-window._bv2_deleteThread = deleteThread;
-window._bv2_exportTxt = exportTxt;
 window.setBoardDataV2 = function(newData) {
     boardData = { ...boardData, ...newData };
     window.boardDataV2 = boardData;
     saveData();
 };
+window._bv2_openCompose = openCompose;
+window._bv2_submitPost = submitPost;
+window._bv2_handleImgSelect = handleImgSelect;
+window._bv2_toggleGlobalEdit = function() { /* 保留原本复杂的逻辑在下面 */ };
+window._bv2_saveGlobalEdit = function() { /* 保留原本复杂的逻辑在下面 */ };
+window._bv2_cancelGlobalEdit = function() { /* 保留原本复杂的逻辑在下面 */ };
+window._bv2_deleteThread = deleteThread;
+window._bv2_exportSelected = exportSelected;
+window._bv2_exitMultiSelectMode = exitMultiSelectMode;
+window._bv2_doMultiSelect = function(action) {
+    if (action === 'cancel') exitMultiSelectMode();
+    else if (action === 'all') {
+        const threads = currentView === 'me' ? boardData.myThreads : boardData.partnerThreads;
+        threads.forEach(t => selectedThreadIds.add(t.id));
+        switchTab(currentView);
+    } else if (action === 'confirm') {
+        if (selectedThreadIds.size === 0) {
+            if(typeof showNotification === 'function') showNotification('请至少选择一条留言', 'warning');
+            return;
+        }
+        document.getElementById('board-format-modal').style.display = 'flex';
+    }
+};
+
 
 // --- 启动 ---
 loadData().then(() => { setInterval(checkStatus, 60000); checkStatus(); });

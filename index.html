@@ -469,10 +469,11 @@
           <div style="font-size:14px;font-weight:500;color:var(--text-primary);">日间 / 夜间模式</div>
           <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">切换浅色和深色主题</div>
         </div>
-        <label class="theme-switch">
-          <input type="checkbox" id="theme-mode-toggle">
-          <span class="theme-switch-slider"></span>
-        </label>
+        <div id="theme-mode-toggle-row" class="setting-pill-row" onclick="window._forceToggleDark()">
+            <div class="setting-pill-switch">
+                <div class="setting-pill-knob"></div>
+            </div>
+        </div>
       </div>
     </div>
     
@@ -1612,7 +1613,7 @@
                 </div>
                 <div id="board-tab-area"></div>
                 <div style="display:flex; align-items:center; gap:10px; flex-shrink: 0;">
-                    <button id="board-export-btn" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:13px;" title="导出记录"><i class="fa-solid fa-file-export"></i></button>
+                    <button id="board-export-btn" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:13px;" title="导出记录"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
                     <button class="board-close-btn" id="board-list-close-btn"><i class="fas fa-times"></i></button>
                 </div>
             </div>
@@ -1622,7 +1623,16 @@
                     <button class="modal-btn modal-btn-secondary" id="back-advanced" onclick="(function(){hideModal(document.getElementById('envelope-board-modal'));showModal(document.getElementById('advanced-modal'))})()">
                         <i class="fas fa-arrow-left"></i> 返回
                     </button>
-                    <button class="modal-btn modal-btn-primary" id="board-new-post-btn" style="flex: 1"><i class="fas fa-plus"></i> 写新留言</button>
+                    <button class="modal-btn modal-btn-primary" id="board-new-post-btn" style="flex: 1; justify-content:center;"><i class="fas fa-plus"></i> 写新留言</button>
+                    <!-- 多选状态栏（默认隐藏） -->
+                    <div id="board-multi-select-bar" style="flex: 1; justify-content:center;gap:8px;">
+                        <span id="board-selected-count" style="font-size:12px; color:var(--text-secondary);">已选 0 条</span>
+                        <div style="display:flex;gap:8px;">
+                            <button id="board-select-all-btn" class="board-add-btn" style="padding:6px 12px; font-size:12px;" onclick="_bv2_doMultiSelect('all')">全选</button>
+                            <button id="board-cancel-select-btn" class="board-add-btn" style="padding:6px 12px; font-size:12px; background:transparent; color:var(--text-secondary); writing-mode: horizontal-tb;" onclick="_bv2_doMultiSelect('cancel')">取消</button>
+                            <button id="board-confirm-select-btn" class="board-add-btn" style="padding:6px 12px; font-size:12px; background:var(--accent-color); color:#fff;" onclick="_bv2_doMultiSelect('confirm')">确认</button>
+                        </div>
+                    </div>
                     <button class="modal-btn modal-btn-secondary" id="close-custom-replies">关闭</button>
                 </div>
             </div>
@@ -1697,6 +1707,22 @@
 <!-- 隐藏的文件选择器(给详情页替换用) -->
 <input type="file" accept="image/*" id="bv2-detail-img-input" style="display:none;">
 
+<!-- 最终导出格式选择弹窗 (放在留言板弹窗同级外面即可) -->
+<div id="board-format-modal" class="modal-overlay" style="display:none; align-items:center; justify-content:center;">
+  <div class="modal-box" style="background:var(--secondary-bg); border-radius:16px; padding:24px; max-width:280px; width:90%; text-align:center; border:1px solid var(--border-color);">
+    <h3 style="margin:0 0 20px 0; font-size:16px; color:var(--text-primary);">选择导出格式</h3>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <button id="final-export-txt" class="board-add-btn" style="width:100%; justify-content:center;" onclick="_bv2_exportSelected('txt')">
+        <i class="fas fa-file-alt"></i> 导出为 TXT 文档
+      </button>
+      <button id="final-export-img" class="board-add-btn" style="width:100%; justify-content:center; background:var(--accent-color); color:#fff;" onclick="_bv2_exportSelected('img')">
+        <i class="fas fa-image"></i> 导出为长图
+      </button>
+    </div>
+    <button id="final-export-cancel" style="margin-top:20px; background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:14px;">返回重选</button>
+  </div>
+</div>
+
     <!-- 月经记录模态框 -->
     <div class="modal" id="period-modal">
         <div class="modal-content">
@@ -1716,7 +1742,7 @@
             
             <div class="period-section">
                 <div class="period-section-title">
-                    <i class="fas fa-comment-dots"></i><span>关心提醒</span>
+                    <i class="fas fa-comment-dots"></i><span>关怀文案</span>
                 </div>
                 <div class="period-random-message" id="period-random-message">
                     记得多喝热水，照顾好自己

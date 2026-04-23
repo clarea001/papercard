@@ -13,6 +13,45 @@ let _searchQuery = '';
 let _searchDebounceTimer = null;
 let _activeGroupFilter = null; 
 
+const CallBgDB = {
+  db: null,
+  storeName: 'callbg_files',
+  init() {
+    return new Promise((resolve, reject) => {
+      if (this.db) return resolve(this.db);
+      const req = indexedDB.open('ChatApp_CallBgDB', 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(this.storeName, { keyPath: 'id' });
+      req.onsuccess = e => { this.db = e.target.result; resolve(this.db); };
+      req.onerror = e => reject(e.target.error);
+    });
+  },
+  put(id, file) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(this.storeName, 'readwrite');
+      tx.objectStore(this.storeName).put({ id, file });
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+  get(id) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(this.storeName, 'readonly');
+      const req = tx.objectStore(this.storeName).get(id);
+      req.onsuccess = () => resolve(req.result ? req.result.file : null);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+  delete(id) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(this.storeName, 'readwrite');
+      tx.objectStore(this.storeName).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  }
+};
+CallBgDB.init().catch(e => console.error('CallBgDB初始化失败', e));
+
 
 const GROUP_COLORS = [
     '#FF6B6B','#FF8E53','#FFC542','#51CF66',
@@ -2638,7 +2677,7 @@ function applyAllAvatarFrames() {
 
 
 // ========== 通话背景渲染 (强制诊断版) ==========
-/*async function _renderCallBgTab(grid) {
+async function _renderCallBgTab(grid) {
     grid.className = ''; 
     grid.style.cssText = ''; 
     grid.innerHTML = ''; 
@@ -2747,7 +2786,7 @@ function applyAllAvatarFrames() {
 }
 
 
-/*async function _handleCallBgUpload(file) {
+async function _handleCallBgUpload(file) {
     const isImage = file.type.startsWith('image/');
     const isVideo = file.type.startsWith('video/');
 
@@ -2818,174 +2857,4 @@ function applyAllAvatarFrames() {
             console.error('保存失败:', err);
         }
     }
-}*/
-function _renderCallBgTab(grid) {
-  grid.className = '';
-  grid.style.cssText = '';
-  grid.innerHTML = '';
-  
-  if (!callBgLibrary || callBgLibrary.length === 0) return;
-  
-  const scrollBox = document.createElement('div');
-  scrollBox.style.cssText = `
-    display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto;
-    max-height: 60vh; padding: 4px; align-content: start;
-  `;
-
-  for (let index = 0; index < callBgLibrary.length; index++) {
-    const item = callBgLibrary[index];
-    const div = document.createElement('div');
-    div.style.cssText = `
-      width: calc(25% - 8px); aspect-ratio: 3/4; position: relative;
-      border-radius: 8px; overflow: hidden;
-      border: 2px solid ${activeCallBg === item.id ? 'var(--accent-color)' : 'var(--border-color)'};
-      cursor: pointer; transition: all 0.2s; background: var(--secondary-bg);
-    `;
-
-    const mediaEl = document.createElement(item.type === 'video' ? 'video' : 'img');
-    mediaEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-    
-    // 🔥 判断拿到的到底是原生 File 还是旧版的 Base64
-    if (item.file instanceof File || item.file instanceof Blob) {
-      mediaEl.src = URL.createObjectURL(item.file);
-    } else if (typeof item.src === 'string') {
-      mediaEl.src = item.src; // 兼容一下旧数据
-    } else {
-      div.innerHTML = '<div style="color:red;padding:5px;font-size:10px;text-align:center;">数据丢失</div>';
-    }
-
-    if (item.type === 'video' && mediaEl.src) {
-      mediaEl.muted = true; mediaEl.playsInline = true; mediaEl.loop = true;
-      div.onmouseover = () => mediaEl.play().catch(()=>{});
-      div.onmouseout = () => { mediaEl.pause(); mediaEl.currentTime = 0; };
-    }
-
-    const checkSpan = document.createElement('span');
-    checkSpan.style.cssText = `position:absolute;top:5px;right:5px;width:20px;height:20px;border-radius:50%;background:var(--accent-color);color:#fff;display:${activeCallBg === item.id ? 'flex' : 'none'};align-items:center;justify-content:center;font-size:11px;pointer-events:none;`;
-    checkSpan.textContent = '✓';
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'callbg-del-btn';
-    // 👇 修改点：去掉了 display:none，改成了 flex 始终可见，加深了背景和加了阴影
-    delBtn.style.cssText = 'position:absolute;bottom:5px;right:5px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.55);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;z-index:2;backdrop-filter:blur(6px);box-shadow:0 2px 6px rgba(0,0,0,0.3);transition: all 0.2s;';
-    delBtn.textContent = '✕';
-
-    div.appendChild(mediaEl);
-    div.appendChild(checkSpan);
-    div.appendChild(delBtn);
-    
-    // 👇 修改点：删掉了控制显隐的 mouseover/mouseout 事件
-    // 如果你想保留鼠标放上去变红的效果，可以加上下面这句 hover 反馈：
-    delBtn.addEventListener('mouseenter', () => {
-      delBtn.style.background = 'rgba(239, 68, 68, 0.85)';
-      delBtn.style.transform = 'scale(1.15)';
-    });
-    delBtn.addEventListener('mouseleave', () => {
-      delBtn.style.background = 'rgba(0,0,0,0.55)';
-      delBtn.style.transform = 'scale(1)';
-    });
-
-    div.addEventListener('click', (e) => {
-      if (e.target === delBtn) return;
-      activeCallBg = (activeCallBg === item.id) ? null : item.id;
-      localStorage.setItem('activeCallBg', activeCallBg || '');
-      if (typeof callFeature !== 'undefined' && typeof callFeature.applyBg === 'function') callFeature.applyBg();
-      _renderCallBgTab(grid);
-    });
-    
-    delBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (!confirm('确定删除这个通话背景吗？')) return;
-      
-      // 从数组删掉
-      callBgLibrary.splice(index, 1);
-      if (activeCallBg === item.id) {
-        activeCallBg = null;
-        localStorage.removeItem('activeCallBg');
-        if (typeof callFeature !== 'undefined' && typeof callFeature.applyBg === 'function') callFeature.applyBg();
-      }
-      
-      // 🔥 单独保存这个大数组，不走 throttledSaveData 的 JSON 化
-      if (typeof APP_PREFIX !== 'undefined' && typeof localforage !== 'undefined') {
-        localforage.setItem(APP_PREFIX + 'callBgLibrary', callBgLibrary).catch(()=>{});
-      }
-      
-      _renderCallBgTab(grid);
-    });
-
-    scrollBox.appendChild(div);
-  }
-  grid.appendChild(scrollBox);
-}
-
-async function _handleCallBgUpload(file) {
-  const isImage = file.type.startsWith('image/');
-  const isVideo = file.type.startsWith('video/');
-  if (!isImage && !isVideo) {
-    if (typeof showNotification === 'function') showNotification('仅支持图片或视频格式', 'error');
-    return;
-  }
-
-  if (file.size > 50 * 1024 * 1024) {
-    if (typeof showNotification === 'function') showNotification('文件过大，建议 50MB 以下', 'error');
-    return;
-  }
-
-  if (typeof showNotification === 'function') showNotification('正在保存...', 'info');
-
-  const type = isImage ? 'image' : 'video';
-
-  // 视频检查时长
-  if (isVideo) {
-    const tempVideo = document.createElement('video');
-    tempVideo.preload = 'metadata';
-    tempVideo.onloadedmetadata = () => {
-      if (tempVideo.duration > 120) {
-        if (typeof showNotification === 'function') showNotification('视频时长不能超过 120 秒', 'error');
-        URL.revokeObjectURL(tempVideo.src);
-        return;
-      }
-      URL.revokeObjectURL(tempVideo.src);
-      doSave(file, type);
-    };
-    tempVideo.onerror = () => {
-      if (typeof showNotification === 'function') showNotification('视频编码不兼容', 'error');
-      URL.revokeObjectURL(tempVideo.src);
-    };
-    tempVideo.src = URL.createObjectURL(file);
-  } else {
-    doSave(file, type);
-  }
-
-  // 🔥 核心：直接把原生 file 对象存进数组，不转 Base64
-  function doSave(file, type) {
-    const id = 'cbg_' + Date.now() + Math.random().toString(36).substr(2, 4);
-    
-    if (!callBgLibrary) callBgLibrary = [];
-    
-    // 把 file 对象直接塞进数组
-    callBgLibrary.push({
-      id: id,
-      type: type,
-      file: file // 👈 关键：存原生 File
-    });
-    
-    activeCallBg = id;
-    localStorage.setItem('activeCallBg', activeCallBg);
-    
-    // 因为存的是二进制对象，不能走普通的 JSON 序列化
-    // 直接调用 localforage 统一存入 CHAT_APP_V3_callBgLibrary
-    if (typeof APP_PREFIX !== 'undefined' && typeof localforage !== 'undefined') {
-      localforage.setItem(APP_PREFIX + 'callBgLibrary', callBgLibrary).then(() => {
-        if (typeof showNotification === 'function') showNotification('背景添加成功', 'success');
-        
-        const listContainer = document.getElementById('custom-replies-list');
-        if (listContainer) _renderCallBgTab(listContainer);
-        if (typeof callFeature !== 'undefined' && typeof callFeature.applyBg === 'function') callFeature.applyBg();
-      }).catch(err => {
-        console.error('通话背景保存失败:', err);
-        if (typeof showNotification === 'function') showNotification('保存失败，空间不足？', 'error');
-      });
-    }
-  }
 }

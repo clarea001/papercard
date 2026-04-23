@@ -616,35 +616,6 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
         S.timerRAF = requestAnimationFrame(tick);
     }
 
-    function applyBg() {
-        const imgEl = document.getElementById('call-bg-img');
-        const vidEl = document.getElementById('call-bg-video');
-        if (imgEl) { imgEl.style.display = 'none'; imgEl.removeAttribute('src'); }
-        if (vidEl) { vidEl.pause(); vidEl.removeAttribute('src'); vidEl.load(); }
-
-        if (!callBgLibrary || !activeCallBg) return;
-        
-        const item = callBgLibrary.find(i => i.id === activeCallBg);
-        if (!item) return;
-
-        // 🔥 从数组里直接拿 File 对象生成临时链接
-        let blobUrl = null;
-        if (item.file instanceof File || item.file instanceof Blob) {
-            blobUrl = URL.createObjectURL(item.file);
-        } else if (typeof item.src === 'string') {
-            blobUrl = item.src; // 兼容旧数据
-        }
-
-        if (!blobUrl) return;
-
-        if (item.type === 'video') {
-            if (vidEl) { vidEl.src = blobUrl; vidEl.play().catch(()=>{}); }
-        } else {
-            if (imgEl) { imgEl.src = blobUrl; imgEl.style.display = 'block'; }
-        }
-    }
-
-
     function positionWindow() {
         const win = document.getElementById('call-window');
         if (!win) return;
@@ -735,6 +706,48 @@ html:not([data-theme="dark"])[data-color-theme="black-white"] .message-sent{
             }
         }
     }
+async function applyBg() {
+    // 1. 安全检查数据库是否就绪
+    if (!CallBgDB || !CallBgDB.db) return;
+
+    // 2. 清理上一次的背景状态，防止视频和图片打架
+    const imgEl = document.getElementById('call-bg-img');
+    const vidEl = document.getElementById('call-bg-video');
+    if (imgEl) { imgEl.style.display = 'none'; imgEl.removeAttribute('src'); }
+    if (vidEl) { vidEl.pause(); vidEl.removeAttribute('src'); vidEl.load(); }
+
+    // 3. 找到当前选中的背景记录
+    const item = callBgLibrary.find(i => i.id === activeCallBg);
+    if (!item) return; // 没选背景就保持默认纯色
+
+    // 4. 去数据库把真文件拿出来
+    try {
+        const tx = CallBgDB.db.transaction(CallBgDB.storeName, 'readonly');
+        const request = tx.objectStore(CallBgDB.storeName).get(item.id);
+        
+        request.onsuccess = () => {
+            const file = request.result?.file;
+            if (!file) return; // 文件丢失就不处理
+            
+            const url = URL.createObjectURL(file); // 拿到真实的本地链接
+
+            // 5. 精准投喂给真正的 DOM 元素！
+            if (item.type === 'video') {
+                if (vidEl) {
+                    vidEl.src = url;
+                    vidEl.play().catch(()=>{});
+                }
+            } else {
+                if (imgEl) {
+                    imgEl.src = url;
+                    imgEl.style.display = 'block'; // 显现图片
+                }
+            }
+        };
+    } catch(e) {
+        console.error('[通话背景] 应用失败:', e);
+    }
+}
 
 
     /* ── Start / End ──────────────────────────────────────── */

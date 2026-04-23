@@ -619,120 +619,112 @@ function _backupCriticalData() {
 }
 
 
-function _tryRecoverFromBackup() {
-    try {
-        const raw = localStorage.getItem(_BACKUP_PREFIX + 'critical');
-        if (!raw) return null;
-        return JSON.parse(raw);
-    } catch (e) {
-        return null;
-    }
-}
-
-// core.js 中修改原来的 saveData 函数
-
-async function saveData() {
-  if (!SESSION_ID) {
-    console.warn('[saveData] SESSION_ID 尚未初始化，跳过保存');
-    return;
-  }
-
-
-  const promises = [
-    { key: 'chatSettings', val: () => localforage.setItem(getStorageKey('chatSettings'), settings) },
-    { key: 'customReplies', val: () => localforage.setItem(getStorageKey('customReplies'), customReplies) },
-    { key: 'customReplyGroups', val: () => localforage.setItem(getStorageKey('customReplyGroups'), window.customReplyGroups || []) },
-    { key: 'customEmojis', val: () => localforage.setItem(getStorageKey('customEmojis'), customEmojis) },
-    { key: 'anniversaries', val: () => localforage.setItem(getStorageKey('anniversaries'), anniversaries) },
-    { key: 'customPokes', val: () => localforage.setItem(getStorageKey('customPokes'), customPokes) },
-    { key: 'customStatuses', val: () => localforage.setItem(getStorageKey('customStatuses'), customStatuses) },
-    { key: 'customMottos', val: () => localforage.setItem(getStorageKey('customMottos'), customMottos) },
-    { key: 'customIntros', val: () => localforage.setItem(getStorageKey('customIntros'), customIntros) },
-    { key: 'stickerLibrary', val: () => localforage.setItem(getStorageKey('stickerLibrary'), stickerLibrary) },
-    { key: 'myStickerLibrary', val: () => localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary) },
-    { key: 'customThemes', val: () => localforage.setItem(`${APP_PREFIX}customThemes`, customThemes) },
-    { key: 'themeSchemes', val: () => localforage.setItem(`${APP_PREFIX}themeSchemes`, themeSchemes) },
-    { key: 'chatMessages', val: () => localforage.setItem(getStorageKey('chatMessages'), messages) },
-    //{ key: 'periodCareMessages', val: () => localforage.setItem(getStorageKey('periodCareMessages'), periodCareMessages) },
-    { key: 'calendarEvents', val: () => localforage.setItem(getStorageKey('calendarEvents'), calendarEvents) },
-    { key: 'moodData', val: () => localforage.setItem(getStorageKey('moodData'), window.moodData) },
-    { key: 'wishingPoolData', val: () => localforage.setItem(getStorageKey('wishingPoolData'), wishingPoolData) },
-    { key: 'callBgLibrary', val: () => localforage.setItem(getStorageKey('callBgLibrary'), callBgLibrary) },
-  ];
-
-  const partnerAvatarSrc = (() => {
-    try {
-      const img = DOMElements.partner.avatar.querySelector('img');
-      return img ? img.src : null;
-    } catch (e) { return null; }
-  })();
-  const myAvatarSrc = (() => {
-    try {
-      const img = DOMElements.me.avatar.querySelector('img');
-      return img ? img.src : null;
-    } catch (e) { return null; }
-  })();
-
-  if (partnerAvatarSrc) {
-    promises.push({ key: 'partnerAvatar', val: () => localforage.setItem(getStorageKey('partnerAvatar'), partnerAvatarSrc) });
-  } else {
-    promises.push({ key: 'partnerAvatar', val: () => localforage.removeItem(getStorageKey('partnerAvatar')) });
-  }
-  if (myAvatarSrc) {
-    promises.push({ key: 'myAvatar', val: () => localforage.setItem(getStorageKey('myAvatar'), myAvatarSrc) });
-  } else {
-    promises.push({ key: 'myAvatar', val: () => localforage.removeItem(getStorageKey('myAvatar')) });
-  }
-
-  const results = await Promise.allSettled(promises.map(p => {
-    try { return p.val(); }
-    catch (e) { return Promise.reject(e); }
-  }));
-
-  const failed = [];
-  results.forEach((r, i) => {
-    if (r.status === 'rejected') {
-      failed.push(promises[i].key);
-      console.error(`[saveData] 保存失败: ${promises[i].key}`, r.reason);
-    }
-  });
-
-   // core.js 的 saveData 末尾
-   /* if (failed.length > 0) {
-    // 过滤出真正是因为空间不足导致的失败
-    const quotaErrors = results.filter((r, i) => 
-        r.status === 'rejected' && 
-        r.reason && 
-        (r.reason.name === 'QuotaExceededError' || String(r.reason).includes('quota'))
-    );
-    
-    if (quotaErrors.length > 0) {
-        showNotification('存储空间不足，请导出备份并清理数据', 'error');
-    } else {
-        // 非空间问题不弹窗吓唬用户，只控制台记录
-        console.warn(`[saveData] ${failed.length} 项数据保存异常(非空间问题):`, failed);
-    }
-    }*/
-    if (failed.length > 0) {
-        // 过滤出真正是因为空间不足或被浏览器拦截导致的失败
-        const criticalErrors = results.filter((r, i) => r.status === 'rejected' && r.reason && (
-            r.reason.name === 'QuotaExceededError' || 
-            String(r.reason).includes('quota') ||
-            String(r.reason).includes('The user denied permission') ||
-            String(r.reason).includes('A mutation operation was attempted on a database that did not allow mutations') // 手机Edge/Safari常见的无痕/隐私拦截报错
-        ));
-        
-        if (criticalErrors.length > 0) {
-            showNotification('⚠️ 当前浏览器拦截了数据存储（可能是无痕模式、隐私设置或退出时清空数据），页面关闭后数据会丢失！建议更换为 Via、Chrome 或普通Safari。', 'error', 8000);
-        } else {
-            // 非空间/拦截问题不弹窗吓唬用户，只控制台记录
-            console.warn(`[saveData] ${failed.length} 项数据保存异常(非空间问题):`, failed);
+        function _tryRecoverFromBackup() {
+            try {
+                const raw = localStorage.getItem(_BACKUP_PREFIX + 'critical');
+                if (!raw) return null;
+                return JSON.parse(raw);
+            } catch (e) {
+                return null;
+            }
         }
-    }
 
-    
-  _backupCriticalData();
-};
+        // core.js 中修改原来的 saveData 函数
+        async function saveData() {
+        if (!SESSION_ID) {
+            console.warn('[saveData] SESSION_ID 尚未初始化，跳过保存');
+            return;
+        }
+
+        // 【核心改动1】：将聊天记录的保存从“打包”中分离出来，立即执行
+        const saveChatMessages = () => {
+            if (messages && messages.length > 0) {
+            return localforage.setItem(getStorageKey('chatMessages'), messages).catch(e => {
+                console.error('[saveData] 聊天记录保存失败', e);
+            });
+            }
+            return Promise.resolve();
+        };
+
+        const saveOtherData = async () => {
+            const otherPromises = [
+            { key: 'chatSettings', val: () => localforage.setItem(getStorageKey('chatSettings'), settings) },
+            { key: 'customReplies', val: () => localforage.setItem(getStorageKey('customReplies'), customReplies) },
+            { key: 'customReplyGroups', val: () => localforage.setItem(getStorageKey('customReplyGroups'), window.customReplyGroups || []) },
+            { key: 'customEmojis', val: () => localforage.setItem(getStorageKey('customEmojis'), customEmojis) },
+            { key: 'anniversaries', val: () => localforage.setItem(getStorageKey('anniversaries'), anniversaries) },
+            { key: 'customPokes', val: () => localforage.setItem(getStorageKey('customPokes'), customPokes) },
+            { key: 'customStatuses', val: () => localforage.setItem(getStorageKey('customStatuses'), customStatuses) },
+            { key: 'customMottos', val: () => localforage.setItem(getStorageKey('customMottos'), customMottos) },
+            { key: 'customIntros', val: () => localforage.setItem(getStorageKey('customIntros'), customIntros) },
+            { key: 'stickerLibrary', val: () => localforage.setItem(getStorageKey('stickerLibrary'), stickerLibrary) },
+            { key: 'myStickerLibrary', val: () => localforage.setItem(getStorageKey('myStickerLibrary'), myStickerLibrary) },
+            { key: 'customThemes', val: () => localforage.setItem(`${APP_PREFIX}customThemes`, customThemes) },
+            { key: 'themeSchemes', val: () => localforage.setItem(`${APP_PREFIX}themeSchemes`, themeSchemes) },
+            { key: 'calendarEvents', val: () => localforage.setItem(getStorageKey('calendarEvents'), calendarEvents) },
+            { key: 'moodData', val: () => localforage.setItem(getStorageKey('moodData'), window.moodData) },
+            { key: 'wishingPoolData', val: () => localforage.setItem(getStorageKey('wishingPoolData'), wishingPoolData) },
+            { key: 'callBgLibrary', val: () => localforage.setItem(getStorageKey('callBgLibrary'), callBgLibrary) },
+            ];
+
+            const partnerAvatarSrc = (() => {
+            try {
+                const img = DOMElements.partner.avatar.querySelector('img');
+                return img ? img.src : null;
+            } catch (e) { return null; }
+            })();
+            const myAvatarSrc = (() => {
+            try {
+                const img = DOMElements.me.avatar.querySelector('img');
+                return img ? img.src : null;
+            } catch (e) { return null; }
+            })();
+
+            // 注意这里：改成了 otherPromises.push
+            if (partnerAvatarSrc) {
+            otherPromises.push({ key: 'partnerAvatar', val: () => localforage.setItem(getStorageKey('partnerAvatar'), partnerAvatarSrc) });
+            } else {
+            otherPromises.push({ key: 'partnerAvatar', val: () => localforage.removeItem(getStorageKey('partnerAvatar')) });
+            }
+            if (myAvatarSrc) {
+            otherPromises.push({ key: 'myAvatar', val: () => localforage.setItem(getStorageKey('myAvatar'), myAvatarSrc) });
+            } else {
+            otherPromises.push({ key: 'myAvatar', val: () => localforage.removeItem(getStorageKey('myAvatar')) });
+            }
+
+            const results = await Promise.allSettled(otherPromises.map(p => {
+            try { return p.val(); }
+            catch (e) { return Promise.reject(e); }
+            }));
+
+            const failed = [];
+            results.forEach((r, i) => {
+            if (r.status === 'rejected') {
+                failed.push(otherPromises[i].key);
+                console.error(`[saveData] 保存失败: ${otherPromises[i].key}`, r.reason);
+            }
+            });
+            
+            // 保留你原来写好的报错拦截提示
+            if (failed.length > 0) {
+            const criticalErrors = results.filter((r, i) => r.status === 'rejected' && r.reason && (
+                r.reason.name === 'QuotaExceededError' || 
+                String(r.reason).includes('quota') ||
+                String(r.reason).includes('The user denied permission') ||
+                String(r.reason).includes('A mutation operation was attempted on a database that did not allow mutations')
+            ));
+            if (criticalErrors.length > 0) {
+                showNotification('⚠️ 当前浏览器拦截了数据存储（可能是无痕模式、隐私设置或退出时清空数据），页面关闭后数据会丢失！建议更换为 Via、Chrome 或普通Safari。', 'error', 8000);
+            }
+            }
+        };
+
+        // 【执行顺序】：1. 立即保存核心聊天记录 2. 异步保存其他数据
+        await saveChatMessages(); // 等待核心数据存完
+        saveOtherData();         // 不等待，让它在后台慢慢跑
+        
+        _backupCriticalData();
+        }
 
         function initializeRandomUI() {
             const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -1437,7 +1429,8 @@ function manageAutoSendTimer() {
                 // 旧浏览器降级方案
                 setTimeout(() => { container.scrollTop = container.scrollHeight; }, 100);
             }
-            immediateSaveData();
+            //immediateSaveData();
+            saveData();
         };
         window.addMessage = addMessage;
 

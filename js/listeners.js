@@ -1491,6 +1491,12 @@ document.getElementById('chat-settings').addEventListener('click', () => {
                 if (localFontNameEl) localFontNameEl.style.display = 'none';
                 if (localFontBtn) localFontBtn.style.display = '';
                 renderLocalFontList();
+                    // 👇 加上这句：每次打开外观弹窗时，强制同步夜间模式按钮的状态
+                const modeRow = document.getElementById('theme-mode-toggle-row');
+                if (modeRow) {
+                    modeRow.classList.toggle('active', document.documentElement.getAttribute('data-theme') === 'dark');
+                }
+
                 showModal(document.getElementById('appearance-modal'));
                 setTimeout(() => { 
                     updateAvatarSettingsUI && updateAvatarSettingsUI(); 

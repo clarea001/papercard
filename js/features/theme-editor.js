@@ -156,8 +156,12 @@ function applyAvatarShapeToDOM(type, shape) {
 
 
 function initThemeEditor() {
+
+    // ==========================================
+    // 1. 打开编辑器按钮（点击时同步一下夜间按钮的状态）
+    // ==========================================
     const openEditorBtn = document.getElementById('open-theme-editor');
-    
+
     if (openEditorBtn) {
         const newBtn = openEditorBtn.cloneNode(true);
         openEditorBtn.parentNode.replaceChild(newBtn, openEditorBtn);
@@ -167,18 +171,43 @@ function initThemeEditor() {
             e.stopPropagation();
             console.log("自定义主题编辑器按钮被点击！");
             
+            // 👉 每次点开编辑器，强行同步夜间模式按钮的颜色
+            if (modeRow) {
+                modeRow.classList.toggle('active', document.documentElement.getAttribute('data-theme') === 'dark');
+            }
+            
             const appearanceModal = document.getElementById('appearance-modal');
             const editorModal = document.getElementById('theme-editor-modal');
 
             if (appearanceModal) hideModal(appearanceModal);
-            
+
             populateThemeEditor();
             populateThemeSelector();
-            
+
             if (editorModal) showModal(editorModal);
         });
     }
 
+    // ==========================================
+    // 1. 夜间模式：直接挂载到 window，让 HTML 的 onclick 直接调用，拒绝任何拦截！
+    // ==========================================
+    window._forceToggleDark = function() {
+        const modeRow = document.getElementById('theme-mode-toggle-row');
+        if (!modeRow) return;
+        
+        // 强行切换
+        modeRow.classList.toggle('active');
+        const isDark = modeRow.classList.contains('active');
+        
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        settings.isDarkMode = isDark;
+        if(typeof throttledSaveData === 'function') throttledSaveData();
+        if(typeof updateBubblePreview === 'function') updateBubblePreview();
+    };
+
+    // ==========================================
+    // 3. 编辑器里的其他按钮（关闭、重置、应用等）
+    // ==========================================
     const closeBtn = document.getElementById('close-theme-editor');
     if (closeBtn) {
         closeBtn.onclick = () => {
@@ -200,7 +229,7 @@ function initThemeEditor() {
             showNotification('已重置为当前主题默认色彩', 'success');
         };
     }
-    
+
     const applyCloseBtn = document.getElementById('apply-close-theme-editor');
     if (applyCloseBtn) {
         applyCloseBtn.onclick = () => {
@@ -221,7 +250,7 @@ function initThemeEditor() {
             showNotification('主题已应用', 'success');
         };
     }
-    
+
     const saveBtn = document.getElementById('save-theme-preset-btn');
     if(saveBtn) saveBtn.onclick = saveCurrentThemeAsPreset;
 
@@ -249,7 +278,7 @@ function initThemeEditor() {
         saveCustomThemes();
         showNotification(`已覆盖「${theme.name}」`, 'success');
     };
-    
+
     const renameBtn = document.getElementById('rename-theme-preset-btn');
     if(renameBtn) renameBtn.onclick = () => {
         const selector = document.getElementById('theme-preset-selector');
@@ -278,7 +307,6 @@ function initThemeEditor() {
             const owBtn = document.getElementById('overwrite-theme-preset-btn');
             if (owBtn) owBtn.style.display = selectedValue.startsWith('custom-') ? '' : 'none';
             if (selectedValue === "current-editing") return;
-            
             if (selectedValue.startsWith('custom-')) {
                 const theme = customThemes.find(t => t.id === selectedValue);
                 if (theme) {
@@ -290,18 +318,16 @@ function initThemeEditor() {
             }
         };
     }
-    const fontApplyBtn = document.getElementById('apply-font-btn'); // 请核对实际ID
-    const fontUrlInput = document.getElementById('font-url-input'); // 请核对实际ID
 
+    const fontApplyBtn = document.getElementById('apply-font-btn');
+    const fontUrlInput = document.getElementById('font-url-input');
     if (fontApplyBtn && fontUrlInput) {
         fontApplyBtn.addEventListener('click', () => {
             const url = fontUrlInput.value.trim();
             settings.customFontUrl = url;
-            // 🌟 加上清理本地字体的逻辑
             settings.useLocalFont = false;
             localforage.removeItem(`${APP_PREFIX}local_font_base64`).catch(()=>{});
             localforage.removeItem(`${APP_PREFIX}local_font_blob`).catch(()=>{});
-            
             showNotification('正在尝试加载字体...', 'info', 1000);
             applyCustomFont(url).then(() => {
                 throttledSaveData();
@@ -314,6 +340,7 @@ function initThemeEditor() {
         });
     }
 }
+
         function populateThemeEditor(currentColors = null) {
             const grid = document.getElementById('theme-editor-grid');
             grid.innerHTML = '';
