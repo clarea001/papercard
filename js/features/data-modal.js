@@ -814,75 +814,7 @@ function bindExportImportEvents() {
             if (typeof clearAllAppData === 'function') clearAllAppData();
         });
     }
-      // ================= 智能垃圾回收大师（绝对不删用户数据版） =================
-   /* const compactBtn = document.getElementById('dm3-compact-btn');
-    if (compactBtn) {
-      compactBtn.addEventListener('click', async () => {
-    compactBtn.disabled = true;
-    compactBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 深度扫描中...';
-    let garbageSize = 0;
-    const cleanDetails = [];
 
-    try {
-      // ========== 真正的第一步：清理孤立的通话背景和表情包尸体 ==========
-      if (window.callBgLibrary && window.CallBgDB && CallBgDB.db) {
-        // 拿出当前正在用的背景 ID
-        const validBgIds = new Set(callBgLibrary.map(b => b.id));
-        const tx = CallBgDB.db.transaction(CallBgDB.storeName, 'readonly');
-        const store = tx.objectStore(CallBgDB.storeName);
-        const request = store.openCursor();
-        
-        await new Promise((resolve) => {
-          request.onsuccess = async (e) => {
-            const cursor = e.target.result;
-            if (cursor) {
-              // 如果这个文件不在当前列表里，说明是被删掉的尸体
-              if (!validBgIds.has(cursor.value.id)) {
-                const file = cursor.value.file;
-                const size = file ? (file.size || file.byteLength || 0) : 0;
-                garbageSize += size;
-                if (size > 0) cleanDetails.push(`清理废弃通话背景 (${(size / (1024 * 1024)).toFixed(1)} MB)`);
-                
-                // 异步删除尸体（用另一个事务，避免锁死游标）
-                const delTx = CallBgDB.db.transaction(CallBgDB.storeName, 'readwrite');
-                delTx.objectStore(CallBgDB.storeName).delete(cursor.value.id);
-              }
-              cursor.continue();
-            } else {
-              resolve();
-            }
-          };
-          request.onerror = () => resolve();
-        });
-      }
-
-      // ========== 真正的第二步：清理旧版冗余缓存 ==========
-      const oldBase64Key = `${window.APP_PREFIX || 'CHAT_APP_V3_'}local_font_base64`;
-      const oldBase64Data = await localforage.getItem(oldBase64Key);
-      if (oldBase64Data && typeof oldBase64Data === 'string' && oldBase64Data.length > 100) {
-        garbageSize += new Blob([oldBase64Data]).size;
-        cleanDetails.push(`清理旧版字体缓存`);
-        await localforage.removeItem(oldBase64Key);
-      }
-
-      // ========== 汇总报告 ==========
-      if (garbageSize > 0) {
-        showNotification(`🧹 真正释放了 ${(garbageSize / (1024 * 1024)).toFixed(1)} MB 硬盘空间，正在刷新...`, 'success', 2500);
-      } else {
-        showNotification('✅ 扫描完毕，没有发现废弃的媒体尸体', 'success', 2000);
-      }
-
-      // 刷新页面让浏览器真正释放文件锁
-      setTimeout(() => window.location.reload(), 1000);
-
-    } catch (err) {
-      console.error('清理失败:', err);
-      showNotification('清理过程遇到错误', 'error');
-      compactBtn.disabled = false;
-      compactBtn.innerHTML = '<i class="fas fa-recycle"></i> 清理';
-    }
-  });
-  }*/
 	// ================= 浏览器存储 FAQ 弹窗 =================
 	const faqTrigger = document.getElementById('dm3-open-faq');
 	if (faqTrigger) {
@@ -896,6 +828,10 @@ function bindExportImportEvents() {
 			
 			// 定义 FAQ 列表（后续要加新问题，直接在这个数组里加对象就行）
 			const faqList = [
+        {
+					q: '以下内容仅供参考，遇到站内问题还是建议及时反馈！',
+					a: '本网站基于milk老师字卡网站二创，AI辅助撰写代码。<b>本网站内不含AI纯概率学</b>。修代码过程中难免出现bug，遇到问题欢迎在<b>小红书内 @苏铂潼 </b>进行反馈。'
+				},
 				{
 					q: '关于“系统占用”',
 					a: '删除图片或视频后，浏览器底层会保留“碎片文件”导致空间无法立刻释放。若“系统占用”数据持续过高，建议通过：<b>清除浏览器缓存</b>，或<b>全量备份导出 → 清除浏览器本站数据 → 重新导入</b>，即可腾出可用空间。'
@@ -915,7 +851,7 @@ function bindExportImportEvents() {
         {
 					q: '关于“进不去本网站”',
 					a: '这是因为网站托管在GitHub Pages上，该平台在全球的访问稳定性会受地区网络环境影响。部分网络环境下，可能会遇到页面加载失败等问题。如果无法打开本网站，建议<b>尝试切换网络（如使用移动数据）、更换浏览器</b>，或稍后再试。'
-				}
+				},
 			];
 
 		// 拼装 HTML 内容
