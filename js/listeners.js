@@ -1294,11 +1294,29 @@ const maxTextInput = document.getElementById('reply-text-max-input');
            function updateDelayUI() {
                 if (minDelayInput) minDelayInput.value = Math.round((settings.replyDelayMin || 3000) / 1000);
                 if (maxDelayInput) maxDelayInput.value = Math.round((settings.replyDelayMax || 7000) / 1000);
-                if (minTextInput) minTextInput?.value = settings.replyTextMin || 1;
-                if (maxTextInput) maxTextInput?.value = settings.replyTextMax || 10;
+                if (minTextInput) minTextInput.value = settings.replyTextMin || 1;
+                if (maxTextInput) maxTextInput.value = settings.replyTextMax || 10;
             }
 
             updateDelayUI();
+
+            /*minDelaySlider.addEventListener('input', (e) => {
+                settings.replyDelayMin = parseInt(e.target.value, 10);
+                if (settings.replyDelayMin > settings.replyDelayMax) {
+                    settings.replyDelayMax = settings.replyDelayMin;
+                }
+                updateDelayUI();
+            });
+            minDelaySlider.addEventListener('change', throttledSaveData);
+
+            maxDelaySlider.addEventListener('input', (e) => {
+                settings.replyDelayMax = parseInt(e.target.value, 10);
+                 if (settings.replyDelayMax < settings.replyDelayMin) {
+                    settings.replyDelayMin = settings.replyDelayMax;
+                }
+                updateDelayUI();
+            });
+            maxDelaySlider.addEventListener('change', throttledSaveData);*/
             // ===== 回复速度输入框 =====
             if (minDelayInput) {
                 minDelayInput.addEventListener('input', () => {
